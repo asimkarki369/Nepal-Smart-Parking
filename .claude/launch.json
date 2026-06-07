@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Expo Dev Client (Metro)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start"],
+      "cwd": "NSPDriverExpo",
+      "port": 8081
+    },
+    {
+      "name": "Expo Android",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "android"],
+      "cwd": "NSPDriverExpo",
+      "port": 8081
+    },
+    {
+      "name": "Expo Web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "web"],
+      "cwd": "NSPDriverExpo",
+      "port": 19006
+    }
+  ]
+}
