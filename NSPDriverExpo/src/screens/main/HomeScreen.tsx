@@ -49,10 +49,10 @@ function calcCost(startTime: Date, endTime: Date, hourlyRate: number) {
 
 // ── zone type config ──────────────────────────────────────────────────────────
 export const ZONE_CONFIG: Record<ZoneType, { color: string; icon: string; label: string; badgeBg: string; badgeText: string }> = {
-  standard: { color: Colors.primary,   icon: 'parking',          label: 'Paid',     badgeBg: Colors.primaryLight, badgeText: Colors.primary },
-  free:     { color: '#0077CC',        icon: 'alpha-b-box',      label: 'BLA',      badgeBg: '#E3F0FF',           badgeText: '#0055AA'      },
-  private:  { color: '#555E6E',        icon: 'shield-lock',      label: 'Private',  badgeBg: '#EBEBEB',           badgeText: '#333'         },
-  electric: { color: '#00A651',        icon: 'lightning-bolt',   label: 'EV',       badgeBg: Colors.greenLight,   badgeText: Colors.green   },
+  standard: { color: '#1A56DB',  icon: 'alpha-p-box',    label: 'Paid',    badgeBg: '#EBF3FF', badgeText: '#1A56DB' },
+  free:     { color: '#0077CC',  icon: 'alpha-b-box',    label: 'BLA',     badgeBg: '#E3F0FF', badgeText: '#0055AA' },
+  private:  { color: '#111118',  icon: 'alpha-p-box',    label: 'Private', badgeBg: '#EBEBEB', badgeText: '#111118' },
+  electric: { color: '#00A651',  icon: 'lightning-bolt', label: 'EV',      badgeBg: Colors.greenLight, badgeText: Colors.green },
 };
 
 function occupancyColor(pct: number) {
@@ -200,19 +200,27 @@ export default function HomeScreen() {
     return () => clearInterval(t);
   }, []);
 
-  // location
+  // location — auto-detect and sort zones by distance
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
       try {
         const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        const { latitude, longitude } = pos.coords;
+        setLocation({ lat: latitude, lng: longitude });
         mapRef.current?.animateToRegion({
-          latitude: pos.coords.latitude, longitude: pos.coords.longitude,
+          latitude, longitude,
           latitudeDelta: 0.02, longitudeDelta: 0.02,
         });
-      } catch { /* default Kathmandu */ }
+        // Auto-select the nearest zone
+        const nearest = [...mockZones].sort((a, b) => {
+          const distA = Math.hypot(a.latitude - latitude, a.longitude - longitude);
+          const distB = Math.hypot(b.latitude - latitude, b.longitude - longitude);
+          return distA - distB;
+        })[0];
+        if (nearest) setSelectedZone(nearest);
+      } catch { /* keep default Kathmandu coords */ }
     })();
   }, []);
 
@@ -481,7 +489,12 @@ export default function HomeScreen() {
 
               {/* Zone list — EasyPark card style */}
               <ScrollView showsVerticalScrollIndicator={false} style={styles.zoneList}>
-                {mockZones
+                {[...mockZones]
+                  .sort((a, b) => {
+                    const dA = Math.hypot(a.latitude - location.lat, a.longitude - location.lng);
+                    const dB = Math.hypot(b.latitude - location.lat, b.longitude - location.lng);
+                    return dA - dB;
+                  })
                   .filter(z => !zoneInput || z.name.toLowerCase().includes(zoneInput.toLowerCase()) || z.code.toLowerCase().includes(zoneInput.toLowerCase()))
                   .map((z, idx, arr) => {
                     const isEV  = z.type === 'electric';
@@ -494,16 +507,13 @@ export default function HomeScreen() {
                         onPress={() => selectZone(z)}
                         activeOpacity={0.7}
                       >
-                        {/* P badge or EV badge */}
-                        <View style={[styles.zonePBadge, isEV && styles.zonePBadgeEV]}>
+                        {/* Zone type badge — color matches type */}
+                        <View style={[styles.zonePBadge, { backgroundColor: ZONE_CONFIG[z.type].color }]}>
                           <Icon
-                            name={isEV ? 'lightning-bolt' : 'alpha-p-box'}
-                            size={isEV ? 14 : 16}
+                            name={ZONE_CONFIG[z.type].icon as any}
+                            size={16}
                             color={Colors.white}
                           />
-                          <Text style={styles.zonePNum}>
-                            {isEV ? '' : z.availableSpots}
-                          </Text>
                         </View>
 
                         {/* Zone info */}

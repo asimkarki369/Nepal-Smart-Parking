@@ -115,7 +115,10 @@ export default function SessionScreen() {
           ))}
         </View>
 
-        <TouchableOpacity style={styles.findBtn} onPress={() => navigation.navigate('Main')}>
+        <TouchableOpacity
+          style={styles.findBtn}
+          onPress={() => navigation.navigate('Main', { screen: 'Home' } as any)}
+        >
           <Icon name="map-search-outline" size={16} color={Colors.white} />
           <Text style={styles.findBtnText}>Find Parking</Text>
         </TouchableOpacity>
