@@ -351,15 +351,21 @@ export default function HomeScreen() {
         })}
       </MapView>
 
-      {/* Floating top bar */}
+      {/* Floating top bar — EasyPark style */}
       <View style={[styles.topBar, { marginTop: insets.top + 8 }]}>
-        <View style={styles.topLeft}>
-          <Text style={styles.topGreet}>👋 {user?.fullName?.split(' ')[0] ?? 'Driver'}</Text>
-          <View style={styles.platePill}>
-            <Icon name="car" size={11} color={Colors.primary} />
-            <Text style={styles.plateText}>{user?.plateNumber ?? '—'}</Text>
-          </View>
-        </View>
+        <TouchableOpacity style={styles.mapFab}>
+          <Icon name="magnify" size={22} color={Colors.text} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.mapFab}>
+          <Icon name="menu" size={22} color={Colors.text} />
+        </TouchableOpacity>
+      </View>
+
+      {/* EV filter fab */}
+      <View style={[styles.evFabWrap, { top: insets.top + 64 }]}>
+        <TouchableOpacity style={styles.evFab}>
+          <Icon name="lightning-bolt" size={20} color={Colors.white} />
+        </TouchableOpacity>
       </View>
 
       {/* Locate me */}
@@ -462,41 +468,64 @@ export default function HomeScreen() {
 
           {step === 'search' ? (
             <>
-              <Text style={styles.sheetTitle}>Where are you parking?</Text>
-              <View style={styles.searchRow}>
-                <Icon name="parking" size={18} color={Colors.primary} style={{ marginLeft: 12 }} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Zone number or name (e.g. Z-KMC-01)"
-                  placeholderTextColor={Colors.muted}
-                  value={zoneInput}
-                  onChangeText={handleZoneSearch}
-                  autoCapitalize="characters"
-                  returnKeyType="search"
-                />
-                {zoneInput.length > 0 && (
-                  <TouchableOpacity onPress={() => setZoneInput('')} style={{ padding: 10 }}>
-                    <Icon name="close-circle" size={16} color={Colors.muted} />
-                  </TouchableOpacity>
-                )}
+              {/* EasyPark-style "Select area" header */}
+              <View style={styles.selectAreaHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sheetTitle}>Select area</Text>
+                  <Text style={styles.gpsNote}>Your GPS position might be uncertain</Text>
+                </View>
+                <TouchableOpacity style={styles.infoBtn}>
+                  <Icon name="information-outline" size={20} color={Colors.muted} />
+                </TouchableOpacity>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.zoneChipScroll}>
-                {mockZones.map(z => {
-                  const cfg = ZONE_CONFIG[z.type];
-                  return (
-                    <TouchableOpacity
-                      key={z.code}
-                      style={[styles.zoneChip, z.occupancyPercent >= 95 && styles.zoneChipFull]}
-                      onPress={() => selectZone(z)}
-                    >
-                      <View style={[styles.zoneChipDot, { backgroundColor: cfg.color }]} />
-                      <Text style={styles.zoneChipName}>{z.name}</Text>
-                      <View style={[styles.zoneTypeBadge, { backgroundColor: cfg.badgeBg }]}>
-                        <Text style={[styles.zoneTypeBadgeText, { color: cfg.badgeText }]}>{cfg.label}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+
+              {/* Zone list — EasyPark card style */}
+              <ScrollView showsVerticalScrollIndicator={false} style={styles.zoneList}>
+                {mockZones
+                  .filter(z => !zoneInput || z.name.toLowerCase().includes(zoneInput.toLowerCase()) || z.code.toLowerCase().includes(zoneInput.toLowerCase()))
+                  .map((z, idx, arr) => {
+                    const isEV  = z.type === 'electric';
+                    const isFull = z.occupancyPercent >= 95;
+                    const zoneNum = z.code.replace('Z-', '').replace(/-/g, ' ');
+                    return (
+                      <TouchableOpacity
+                        key={z.code}
+                        style={[styles.zoneListItem, idx === arr.length - 1 && { borderBottomWidth: 0 }]}
+                        onPress={() => selectZone(z)}
+                        activeOpacity={0.7}
+                      >
+                        {/* P badge or EV badge */}
+                        <View style={[styles.zonePBadge, isEV && styles.zonePBadgeEV]}>
+                          <Icon
+                            name={isEV ? 'lightning-bolt' : 'alpha-p-box'}
+                            size={isEV ? 14 : 16}
+                            color={Colors.white}
+                          />
+                          <Text style={styles.zonePNum}>
+                            {isEV ? '' : z.availableSpots}
+                          </Text>
+                        </View>
+
+                        {/* Zone info */}
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.zoneListName} numberOfLines={1}>{z.name}</Text>
+                          <Text style={styles.zoneListSub}>
+                            {z.type === 'free' ? 'Free' : z.type === 'electric' ? 'Charging station' : 'Surface Lot'}
+                            {' • '}
+                            {z.type === 'private' ? z.privateOperator : 'NSP'}
+                          </Text>
+                        </View>
+
+                        {/* Availability / info */}
+                        <TouchableOpacity style={styles.zoneInfoBtn}>
+                          {isFull
+                            ? <Text style={styles.zoneFullTag}>Full</Text>
+                            : <Icon name="information-outline" size={18} color={Colors.muted} />
+                          }
+                        </TouchableOpacity>
+                      </TouchableOpacity>
+                    );
+                  })}
               </ScrollView>
             </>
           ) : (
@@ -742,22 +771,46 @@ const styles = StyleSheet.create({
 
   topBar: {
     position: 'absolute', left: 16, right: 16,
-    flexDirection: 'row', alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  topLeft: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
+  mapFab: {
+    width: 46, height: 46, borderRadius: 23,
     backgroundColor: Colors.white,
-    paddingHorizontal: 14, paddingVertical: 9,
-    borderRadius: 30,
-    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 4,
   },
-  topGreet:  { fontSize: 13, fontWeight: '700', color: Colors.text },
-  platePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
+  evFabWrap: { position: 'absolute', left: 16 },
+  evFab: {
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: Colors.green,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, elevation: 4,
   },
-  plateText: { fontSize: 11, fontWeight: '700', color: Colors.primary },
+
+  // Select area header
+  selectAreaHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
+  gpsNote:  { fontSize: 13, color: Colors.muted, marginTop: 2 },
+  infoBtn:  { padding: 4, marginTop: 2 },
+
+  // Zone list — EasyPark card style
+  zoneList: { marginHorizontal: -Spacing.lg },
+  zoneListItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingHorizontal: Spacing.lg, paddingVertical: 16,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  zonePBadge: {
+    width: 40, height: 40, borderRadius: 8,
+    backgroundColor: Colors.zoneBadge,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  zonePBadgeEV: { backgroundColor: Colors.green },
+  zonePNum:  { fontSize: 10, fontWeight: '800', color: Colors.white },
+  zoneListName: { fontSize: 15, fontWeight: '600', color: Colors.text },
+  zoneListSub:  { fontSize: 12, color: Colors.muted, marginTop: 2 },
+  zoneInfoBtn:  { padding: 4 },
+  zoneFullTag:  { fontSize: 11, fontWeight: '700', color: Colors.red, backgroundColor: Colors.redLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
 
   youDot:      { width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,110,230,0.2)', alignItems: 'center', justifyContent: 'center' },
   youDotInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: Colors.primary, borderWidth: 2, borderColor: Colors.white },
@@ -794,7 +847,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border,
     alignSelf: 'center', marginBottom: 12,
   },
-  sheetTitle: { fontSize: 17, fontWeight: '700', color: Colors.text, marginBottom: 12 },
+  sheetTitle: { fontSize: 22, fontWeight: '800', color: Colors.text, marginBottom: 2 },
 
   searchRow: {
     flexDirection: 'row', alignItems: 'center',

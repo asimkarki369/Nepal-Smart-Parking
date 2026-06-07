@@ -19,6 +19,7 @@ import PaymentConfirmScreen from '@/screens/main/PaymentConfirmScreen';
 import SessionScreen       from '@/screens/main/SessionScreen';
 import HistoryScreen       from '@/screens/main/HistoryScreen';
 import WalletScreen        from '@/screens/main/WalletScreen';
+import VehiclesScreen      from '@/screens/main/VehiclesScreen';
 
 // Officer screens
 import OfficerLoginScreen    from '@/screens/officer/OfficerLoginScreen';
@@ -148,6 +149,7 @@ export default function AppNavigator() {
             <Stack.Screen name="Main"           component={MainTabs} />
             <Stack.Screen name="ZoneDetail"     component={ZoneDetailScreen} />
             <Stack.Screen name="PaymentConfirm" component={PaymentConfirmScreen} />
+            <Stack.Screen name="Vehicles"       component={VehiclesScreen} />
           </>
         )}
 

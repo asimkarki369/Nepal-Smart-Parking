@@ -9,6 +9,7 @@ export type RootStackParamList = {
   Main: undefined;
   ZoneDetail: { zoneCode: string };
   PaymentConfirm: { zoneCode: string; vehicleType: '2w' | '4w'; durationMinutes: number };
+  Vehicles: undefined;
   // Officer auth
   OfficerLogin: undefined;
   // Officer main
