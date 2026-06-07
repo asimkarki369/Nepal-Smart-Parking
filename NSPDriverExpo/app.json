@@ -26,6 +26,9 @@
         "POST_NOTIFICATIONS"
       ]
     },
+    "experiments": {
+      "baseUrl": "/Nepal-Smart-Parking"
+    },
     "plugins": [
       [
         "expo-location",
