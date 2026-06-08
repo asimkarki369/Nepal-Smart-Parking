@@ -12,11 +12,19 @@ const OFFICER_BIO_PASS    = 'nsp_officer_bio_password';
 
 // ── Hardware check ────────────────────────────────────────────────────────────
 
-/** Returns true if the device has biometric hardware AND an enrolled biometric. */
+/**
+ * Returns true if the device has biometric hardware AND an enrolled biometric.
+ * Returns false (never throws) if the native module isn't available yet —
+ * this happens before the first `expo run:android` build after install.
+ */
 export async function isBiometricAvailable(): Promise<boolean> {
-  const hasHW    = await LocalAuth.hasHardwareAsync();
-  const enrolled = await LocalAuth.isEnrolledAsync();
-  return hasHW && enrolled;
+  try {
+    const hasHW    = await LocalAuth.hasHardwareAsync();
+    const enrolled = await LocalAuth.isEnrolledAsync();
+    return hasHW && enrolled;
+  } catch {
+    return false; // native module not compiled in yet — needs rebuild
+  }
 }
 
 /**
@@ -24,30 +32,39 @@ export async function isBiometricAvailable(): Promise<boolean> {
  * e.g. "Fingerprint", "Face ID", or "Biometric"
  */
 export async function getBiometricLabel(): Promise<string> {
-  const types = await LocalAuth.supportedAuthenticationTypesAsync();
-  const hasFace        = types.includes(LocalAuth.AuthenticationType.FACIAL_RECOGNITION);
-  const hasFingerprint = types.includes(LocalAuth.AuthenticationType.FINGERPRINT);
-  if (hasFace && hasFingerprint) return 'Biometric';
-  if (hasFace)        return 'Face ID';
-  if (hasFingerprint) return 'Fingerprint';
+  try {
+    const types = await LocalAuth.supportedAuthenticationTypesAsync();
+    const hasFace        = types.includes(LocalAuth.AuthenticationType.FACIAL_RECOGNITION);
+    const hasFingerprint = types.includes(LocalAuth.AuthenticationType.FINGERPRINT);
+    if (hasFace && hasFingerprint) return 'Biometric';
+    if (hasFace)        return 'Face ID';
+    if (hasFingerprint) return 'Fingerprint';
+  } catch { /* ignore */ }
   return 'Biometric';
 }
 
 /** Returns the appropriate icon name for MaterialCommunityIcons. */
 export async function getBiometricIcon(): Promise<string> {
-  const types = await LocalAuth.supportedAuthenticationTypesAsync();
-  const hasFace = types.includes(LocalAuth.AuthenticationType.FACIAL_RECOGNITION);
-  return hasFace ? 'face-recognition' : 'fingerprint';
+  try {
+    const types = await LocalAuth.supportedAuthenticationTypesAsync();
+    const hasFace = types.includes(LocalAuth.AuthenticationType.FACIAL_RECOGNITION);
+    return hasFace ? 'face-recognition' : 'fingerprint';
+  } catch { /* ignore */ }
+  return 'fingerprint';
 }
 
 /** Trigger the system biometric prompt. Returns true on success. */
 export async function authenticateBiometric(promptMessage: string): Promise<boolean> {
-  const result = await LocalAuth.authenticateAsync({
-    promptMessage,
-    disableDeviceFallback: false,
-    cancelLabel: 'Use Password',
-  });
-  return result.success;
+  try {
+    const result = await LocalAuth.authenticateAsync({
+      promptMessage,
+      disableDeviceFallback: false,
+      cancelLabel: 'Use Password',
+    });
+    return result.success;
+  } catch {
+    return false;
+  }
 }
 
 // ── Driver biometric credentials ──────────────────────────────────────────────
