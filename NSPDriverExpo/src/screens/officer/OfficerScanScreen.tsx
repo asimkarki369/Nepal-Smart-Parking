@@ -331,47 +331,61 @@ export default function OfficerScanScreen() {
         animationType="slide"
         onRequestClose={() => setShowConfirm(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setShowConfirm(false)}
+          />
           <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 16 }]}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Confirm Number Plate</Text>
             <Text style={styles.modalSub}>Check the photo is clear, then type the plate number below</Text>
 
-            {platePhoto && (
-              <Image source={{ uri: platePhoto }} style={styles.modalPhoto} />
-            )}
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              {platePhoto && (
+                <Image source={{ uri: platePhoto }} style={styles.modalPhoto} />
+              )}
 
-            <View style={styles.modalInputWrap}>
-              <View style={styles.plateFlag}>
-                <Text style={styles.plateFlagText}>🇳🇵</Text>
+              <View style={styles.modalInputWrap}>
+                <View style={styles.plateFlag}>
+                  <Text style={styles.plateFlagText}>🇳🇵</Text>
+                </View>
+                <TextInput
+                  style={styles.plateInput}
+                  placeholder="Type plate number from photo"
+                  placeholderTextColor={Colors.muted}
+                  value={plate}
+                  onChangeText={t => setPlate(t.toUpperCase())}
+                  autoCapitalize="characters"
+                  autoFocus
+                />
               </View>
-              <TextInput
-                style={styles.plateInput}
-                placeholder="Type plate number from photo"
-                placeholderTextColor={Colors.muted}
-                value={plate}
-                onChangeText={t => setPlate(t.toUpperCase())}
-                autoCapitalize="characters"
-                autoFocus
-              />
-            </View>
 
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalRetakeBtn} onPress={handleRetake}>
-                <Icon name="camera-retake-outline" size={16} color="#E65100" />
-                <Text style={styles.modalRetakeBtnText}>Retake</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalConfirmBtn, !plate.trim() && { opacity: 0.5 }]}
-                onPress={handleConfirmPhoto}
-                disabled={!plate.trim()}
-              >
-                <Icon name="check" size={16} color={Colors.white} />
-                <Text style={styles.modalConfirmBtnText}>Confirm Plate</Text>
-              </TouchableOpacity>
-            </View>
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalRetakeBtn} onPress={handleRetake}>
+                  <Icon name="camera-retake-outline" size={16} color="#E65100" />
+                  <Text style={styles.modalRetakeBtnText}>Retake</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalConfirmBtn, !plate.trim() && { opacity: 0.5 }]}
+                  onPress={handleConfirmPhoto}
+                  disabled={!plate.trim()}
+                >
+                  <Icon name="check" size={16} color={Colors.white} />
+                  <Text style={styles.modalConfirmBtnText}>Confirm Plate</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </KeyboardAvoidingView>
   );
