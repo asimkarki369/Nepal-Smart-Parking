@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView,
-  StatusBar, ActivityIndicator, Alert, Modal, FlatList,
+  StatusBar, ActivityIndicator, Alert, Modal, FlatList, Image,
 } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import MapView, { Marker } from 'react-native-maps';
@@ -871,9 +871,13 @@ export default function HomeScreen() {
             {user && (
               <View style={styles.menuUserRow}>
                 <View style={styles.menuAvatar}>
-                  <Text style={styles.menuAvatarText}>
-                    {user.fullName.trim().split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
-                  </Text>
+                  {user.profilePicture ? (
+                    <Image source={{ uri: user.profilePicture }} style={styles.menuAvatarImage} />
+                  ) : (
+                    <Text style={styles.menuAvatarText}>
+                      {user.fullName.trim().split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+                    </Text>
+                  )}
                 </View>
                 <View>
                   <Text style={styles.menuUserName}>{user.fullName}</Text>
@@ -1419,7 +1423,8 @@ const styles = StyleSheet.create({
     width: 48, height: 48, borderRadius: 24,
     backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
   },
-  menuAvatarText: { fontSize: 18, fontWeight: '800', color: Colors.white },
+  menuAvatarText:  { fontSize: 18, fontWeight: '800', color: Colors.white },
+  menuAvatarImage: { width: 48, height: 48, borderRadius: 24 },
   menuUserName:   { fontSize: 15, fontWeight: '700', color: Colors.text },
   menuUserSub:    { fontSize: 11, color: Colors.muted, marginTop: 2 },
   menuDivider:    { height: 1, backgroundColor: Colors.border, marginBottom: Spacing.sm },
