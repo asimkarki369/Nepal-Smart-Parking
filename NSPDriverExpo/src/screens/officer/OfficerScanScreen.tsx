@@ -12,7 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { Colors, Spacing, BorderRadius } from '@/utils/theme';
 import { RootStackParamList } from '@/navigation/types';
-import { calcFine } from '@/utils/fineCalc';
+import { calcFine, ILLEGAL_PARKING_FINE } from '@/utils/fineCalc';
 import { useStore, RegistryEntry } from '@/store/useStore';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -84,13 +84,13 @@ export default function OfficerScanScreen() {
     // Look up in live session registry (connected to driver store)
     const session = sessionRegistry[p];
     if (!session) {
-      // No check-in found — illegal parking
+      // No check-in found — illegal parking (flat mandatory fine)
       setResult({
         sessionId: '', plateNumber: p, driverName: 'Unknown',
         phone: '—', vehicleType: '4w', zoneCode: '—', zoneName: '—',
         startTime: new Date(), endTimeCap: null, hourlyRate: 0,
         paymentMethod: '—', qrToken: '',
-        overtimeMins: 0, fineAmount: calcFine(999), status: 'no_session',
+        overtimeMins: 0, fineAmount: ILLEGAL_PARKING_FINE, status: 'no_session',
       });
       setLoading(false);
       return;

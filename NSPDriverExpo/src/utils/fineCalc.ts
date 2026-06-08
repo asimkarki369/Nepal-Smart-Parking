@@ -18,6 +18,9 @@ export const FINE_BRACKETS: FineBracket[] = [
 
 const MAX_FINE = 3500;
 
+/** Flat mandatory fine for vehicles with NO parking session at all */
+export const ILLEGAL_PARKING_FINE = 1500;
+
 export function calcFine(overtimeMins: number): number {
   if (overtimeMins <= 0)   return 0;   // no overtime = no fine
   if (overtimeMins <= 15)  return 100; // even 1 min = Rs 100
