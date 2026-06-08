@@ -195,11 +195,14 @@ export default function VehiclesScreen() {
               {/* ── Main row ── */}
               <View style={styles.vehicleRow}>
                 {/* Vehicle type icon */}
-                <View style={[styles.typeIconBox, isSelected && styles.typeIconBoxSelected]}>
+                <View style={[
+                  styles.typeIconBox,
+                  isSelected && (v.vehicleType === 'ev' ? styles.typeIconBoxSelectedEv : styles.typeIconBoxSelected),
+                ]}>
                   <Icon
                     name={VEHICLE_ICONS[v.vehicleType] as any}
                     size={22}
-                    color={isSelected ? Colors.white : Colors.primary}
+                    color={isSelected ? Colors.white : v.vehicleType === 'ev' ? Colors.green : Colors.primary}
                   />
                 </View>
 
@@ -420,6 +423,9 @@ const styles = StyleSheet.create({
   },
   typeIconBoxSelected: {
     backgroundColor: Colors.primary, borderColor: Colors.primary,
+  },
+  typeIconBoxSelectedEv: {
+    backgroundColor: Colors.green, borderColor: Colors.green,
   },
 
   vehicleInfo:    { flex: 1, minWidth: 0 },

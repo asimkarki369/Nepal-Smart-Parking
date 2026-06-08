@@ -199,7 +199,7 @@ export default function ZoneDetailScreen() {
                   key={opt.value}
                   style={[
                     styles.vehicleChip,
-                    active  && styles.vehicleChipActive,
+                    active && (opt.value === 'ev' ? styles.vehicleChipActiveEv : styles.vehicleChipActive),
                     locked  && styles.vehicleChipLocked,
                   ]}
                   onPress={() => {
@@ -221,7 +221,12 @@ export default function ZoneDetailScreen() {
                   <Icon
                     name={opt.icon as any}
                     size={20}
-                    color={active ? Colors.white : locked ? Colors.border : Colors.muted}
+                    color={
+                      active ? Colors.white
+                      : locked ? Colors.border
+                      : opt.value === 'ev' ? Colors.green
+                      : Colors.muted
+                    }
                   />
                   <Text style={[
                     styles.vehicleChipLabel,
@@ -398,6 +403,10 @@ const styles = StyleSheet.create({
   vehicleChipActive: {
     backgroundColor: Colors.primary,
     borderColor:     Colors.primary,
+  },
+  vehicleChipActiveEv: {
+    backgroundColor: Colors.green,
+    borderColor:     Colors.green,
   },
   vehicleChipLocked: {
     backgroundColor: Colors.light,

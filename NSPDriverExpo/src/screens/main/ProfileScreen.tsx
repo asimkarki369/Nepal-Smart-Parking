@@ -242,7 +242,7 @@ export default function ProfileScreen() {
             activeOpacity={0.8}
           >
             <View style={styles.primaryVehicleLeft}>
-              <Icon name={VEHICLE_ICONS[vType] as any} size={20} color={Colors.primary} />
+              <Icon name={VEHICLE_ICONS[vType] as any} size={20} color={vType === 'ev' ? Colors.green : Colors.primary} />
               <View>
                 <Text style={styles.primaryVehiclePlate}>{plate}</Text>
                 <Text style={styles.primaryVehicleType}>{VEHICLE_LABELS[vType]} · Primary</Text>
