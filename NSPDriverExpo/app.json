@@ -48,7 +48,8 @@
         {
           "googleMapsApiKey": "AIzaSyDTaGLkW5rwpvKOvby9AqLZGTnlwY-jyWk"
         }
-      ]
+      ],
+      "expo-sharing"
     ]
   }
 }

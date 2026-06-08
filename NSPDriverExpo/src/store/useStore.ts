@@ -2,20 +2,38 @@ import { create } from 'zustand';
 
 export type VehicleType = '2w' | '4w' | 'ev' | 'bus';
 
+// ── Vehicle (one per plate) ───────────────────────────────────────────────────
+export interface Vehicle {
+  id: string;
+  plateNumber: string;
+  vehicleType: VehicleType;
+  isPrimary: boolean;
+  /**
+   * true  — backend confirmed plate matches Bluebook / DOTM registration.
+   * false — self-declared; officer may verify during parking.
+   */
+  plateVerified: boolean;
+}
+
 // ── Driver types ──────────────────────────────────────────────────────────────
 export interface User {
   id: string;
   fullName: string;
-  phone: string;
-  plateNumber: string;
-  vehicleType: VehicleType;
+  nationalId: string;       // Nepal citizenship / national ID number
+  phone?: string;           // optional — for notifications only
+  vehicles: Vehicle[];      // multiple vehicles per account
   walletBalance: number;
-  /**
-   * true  — backend confirmed this plate matches the Bluebook / vehicle registration.
-   * false — plate is self-declared only (default for new accounts until verified).
-   * Officers can see this flag; fines still go to the account holder regardless.
-   */
-  plateVerified?: boolean;
+}
+
+// ── Helpers — pull primary vehicle info from user ─────────────────────────────
+export function primaryVehicle(user: User): Vehicle | undefined {
+  return user.vehicles.find(v => v.isPrimary) ?? user.vehicles[0];
+}
+export function userPlate(user: User): string {
+  return primaryVehicle(user)?.plateNumber ?? '—';
+}
+export function userVehicleType(user: User): VehicleType {
+  return primaryVehicle(user)?.vehicleType ?? '4w';
 }
 
 export interface ActiveSession {
@@ -53,6 +71,7 @@ export interface RegistryEntry {
   sessionId:    string;
   plateNumber:  string;
   driverName:   string;
+  nationalId:   string;     // ties fine to real identity, not just plate
   phone:        string;
   vehicleType:  VehicleType;
   zoneCode:     string;
@@ -129,8 +148,9 @@ export const useStore = create<NSPStore>((set, get) => ({
     const s = get().activeSession;
     const u = get().user;
     if (s && u) {
+      const plate = primaryVehicle(u)?.plateNumber ?? '';
       const reg = { ...get().sessionRegistry };
-      delete reg[u.plateNumber.toUpperCase()];
+      delete reg[plate.toUpperCase()];
       set({ sessionRegistry: reg });
     }
     set({ user: null, isAuthenticated: false, activeSession: null });
@@ -138,13 +158,15 @@ export const useStore = create<NSPStore>((set, get) => ({
 
   setActiveSession: (session) => {
     const user = get().user;
-    if (session && user) {
+    const pv   = user ? primaryVehicle(user) : undefined;
+    if (session && user && pv) {
       // Register in shared registry so officer can see it
       const entry: RegistryEntry = {
         sessionId:    session.sessionId,
-        plateNumber:  user.plateNumber,
+        plateNumber:  pv.plateNumber,
         driverName:   user.fullName,
-        phone:        user.phone,
+        nationalId:   user.nationalId,
+        phone:        user.phone ?? '',
         vehicleType:  session.vehicleType,
         zoneCode:     session.zoneCode,
         zoneName:     session.zoneName,
@@ -155,13 +177,14 @@ export const useStore = create<NSPStore>((set, get) => ({
         qrToken:      session.qrToken,
       };
       const reg = { ...get().sessionRegistry };
-      reg[user.plateNumber.toUpperCase()] = entry;
+      reg[pv.plateNumber.toUpperCase()] = entry;
       set({ activeSession: session, sessionRegistry: reg });
     } else {
       // Session ended — remove from registry
       if (user) {
+        const plate = primaryVehicle(user)?.plateNumber ?? '';
         const reg = { ...get().sessionRegistry };
-        delete reg[user.plateNumber.toUpperCase()];
+        delete reg[plate.toUpperCase()];
         set({ activeSession: null, sessionRegistry: reg });
       } else {
         set({ activeSession: null });
@@ -179,9 +202,10 @@ export const useStore = create<NSPStore>((set, get) => ({
     const updated = { ...sess, endTimeCap: cap, expiresAt: cap ?? sess.expiresAt, durationMinutes: sess.durationMinutes + additionalMinutes };
     // Also update registry
     if (user) {
+      const plate = primaryVehicle(user)?.plateNumber ?? '';
       const reg = { ...get().sessionRegistry };
-      if (reg[user.plateNumber.toUpperCase()]) {
-        reg[user.plateNumber.toUpperCase()] = { ...reg[user.plateNumber.toUpperCase()], endTimeCap: cap };
+      if (reg[plate.toUpperCase()]) {
+        reg[plate.toUpperCase()] = { ...reg[plate.toUpperCase()], endTimeCap: cap };
       }
       set({ activeSession: updated, sessionRegistry: reg });
     } else {

@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   StatusBar, ActivityIndicator, KeyboardAvoidingView,
-  Platform, ScrollView, Alert,
+  Platform, ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { Colors, Spacing, BorderRadius, Typography } from '@/utils/theme';
+import { Colors, Spacing, BorderRadius } from '@/utils/theme';
+import { useStore } from '@/store/useStore';
 import { authAPI } from '@/services/api';
 import { RootStackParamList } from '@/navigation/types';
 
@@ -16,25 +18,44 @@ type NavProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
 export default function LoginScreen() {
   const navigation = useNavigation<NavProp>();
-  const [phone, setPhone] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const { setUser } = useStore();
 
-  const isValid = phone.length === 10 && /^(97|98)\d{8}$/.test(phone);
+  const [nationalId, setNationalId] = useState('');
+  const [password,   setPassword]   = useState('');
+  const [showPass,   setShowPass]   = useState(false);
+  const [loading,    setLoading]    = useState(false);
+  const [errors,     setErrors]     = useState<Record<string, string>>({});
 
-  const handleSendOTP = async () => {
-    if (!isValid) {
-      setError('Enter a valid 10-digit Nepal mobile number (starting with 97 or 98).');
-      return;
-    }
-    setError('');
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (nationalId.trim().length < 4) e.nationalId = 'Enter your National ID number.';
+    if (password.length < 4)          e.password   = 'Enter your password.';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleLogin = async () => {
+    if (!validate()) return;
     setLoading(true);
     try {
-      await authAPI.sendOTP(phone);
-      navigation.navigate('OTP', { phone });
+      const res = await authAPI.login({ nationalId: nationalId.trim(), password });
+      const { token, user } = res.data;
+      await AsyncStorage.setItem('auth_token', token);
+      setUser(user);
     } catch {
-      // Backend not live yet — navigate anyway for development
-      navigation.navigate('OTP', { phone });
+      // Dev fallback — load saved account from AsyncStorage
+      const saved = await AsyncStorage.getItem('nsp_user');
+      if (saved) {
+        const user = JSON.parse(saved);
+        if (user.nationalId === nationalId.trim()) {
+          await AsyncStorage.setItem('auth_token', 'dev_token');
+          setUser(user);
+        } else {
+          setErrors({ nationalId: 'National ID not found. Please register first.' });
+        }
+      } else {
+        setErrors({ nationalId: 'Account not found. Please register first.' });
+      }
     } finally {
       setLoading(false);
     }
@@ -45,163 +66,146 @@ export default function LoginScreen() {
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
-      {/* Header band */}
-      <View style={styles.header}>
-        <View style={styles.logoCircle}>
-          <Icon name="parking" size={36} color={Colors.primary} />
-        </View>
-        <Text style={styles.appName}>Nepal Smart Parking</Text>
-        <Text style={styles.tagline}>Find. Park. Pay. — in seconds.</Text>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.body}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.title}>Welcome back</Text>
-        <Text style={styles.subtitle}>Enter your mobile number to continue</Text>
-
-        {/* Phone input */}
-        <View style={[styles.inputWrapper, error ? styles.inputError : null]}>
-          <View style={styles.prefix}>
-            <Text style={styles.prefixText}>🇳🇵  +977</Text>
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        {/* Logo / brand */}
+        <View style={styles.brand}>
+          <View style={styles.logoBox}>
+            <Icon name="alpha-p-box" size={40} color={Colors.white} />
           </View>
-          <View style={styles.divider} />
+          <Text style={styles.brandName}>Nepal Smart Parking</Text>
+          <Text style={styles.brandSub}>Sign in to your account</Text>
+        </View>
+
+        {/* National ID */}
+        <Text style={styles.label}>National ID Number</Text>
+        <View style={[styles.inputWrap, errors.nationalId && styles.inputError]}>
+          <Icon name="card-account-details-outline" size={18} color={Colors.muted} style={styles.icon} />
           <TextInput
             style={styles.input}
-            placeholder="98XXXXXXXX"
+            placeholder="Enter your citizenship / National ID"
             placeholderTextColor={Colors.muted}
-            keyboardType="phone-pad"
-            maxLength={10}
-            value={phone}
-            onChangeText={t => { setPhone(t.replace(/\D/g, '')); setError(''); }}
+            value={nationalId}
+            onChangeText={t => { setNationalId(t); setErrors(e => ({ ...e, nationalId: '' })); }}
+            autoCapitalize="none"
+            returnKeyType="next"
           />
         </View>
+        {errors.nationalId ? <ErrorMsg msg={errors.nationalId} /> : null}
 
-        {error ? (
-          <View style={styles.errorRow}>
-            <Icon name="alert-circle-outline" size={14} color={Colors.red} />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : null}
+        {/* Password */}
+        <Text style={styles.label}>Password</Text>
+        <View style={[styles.inputWrap, errors.password && styles.inputError]}>
+          <Icon name="lock-outline" size={18} color={Colors.muted} style={styles.icon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your password"
+            placeholderTextColor={Colors.muted}
+            value={password}
+            onChangeText={t => { setPassword(t); setErrors(e => ({ ...e, password: '' })); }}
+            secureTextEntry={!showPass}
+            returnKeyType="done"
+            onSubmitEditing={handleLogin}
+          />
+          <TouchableOpacity onPress={() => setShowPass(v => !v)} style={styles.eyeBtn}>
+            <Icon name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.muted} />
+          </TouchableOpacity>
+        </View>
+        {errors.password ? <ErrorMsg msg={errors.password} /> : null}
 
-        {/* Send OTP button */}
+        {/* Login button */}
         <TouchableOpacity
-          style={[styles.btn, (!isValid || loading) && styles.btnDisabled]}
-          onPress={handleSendOTP}
-          disabled={!isValid || loading}
+          style={[styles.btn, (!nationalId || !password || loading) && styles.btnDisabled]}
+          onPress={handleLogin}
+          disabled={!nationalId || !password || loading}
           activeOpacity={0.85}
         >
-          {loading ? (
-            <ActivityIndicator color={Colors.white} size="small" />
-          ) : (
-            <>
-              <Text style={styles.btnText}>Send OTP</Text>
-              <Icon name="arrow-right" size={18} color={Colors.white} />
-            </>
-          )}
+          {loading
+            ? <ActivityIndicator color={Colors.white} size="small" />
+            : <Text style={styles.btnText}>Sign In</Text>
+          }
         </TouchableOpacity>
 
-        {/* Terms */}
-        <Text style={styles.terms}>
-          By continuing, you agree to NSP's{' '}
-          <Text style={styles.termsLink}>Terms of Service</Text>
-          {' '}and{' '}
-          <Text style={styles.termsLink}>Privacy Policy</Text>.
-        </Text>
-      </ScrollView>
+        {/* Register link */}
+        <View style={styles.registerRow}>
+          <Text style={styles.registerPrompt}>Don't have an account? </Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+            <Text style={styles.registerLink}>Register</Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Footer */}
-      <View style={styles.footer}>
-        <Icon name="shield-check-outline" size={14} color={Colors.muted} />
-        <Text style={styles.footerText}>Your data is secure and never shared.</Text>
-      </View>
+        {/* Officer link */}
+        <TouchableOpacity
+          style={styles.officerLink}
+          onPress={() => navigation.navigate('OfficerLogin')}
+        >
+          <Icon name="shield-account-outline" size={15} color={Colors.muted} />
+          <Text style={styles.officerLinkText}>Sign in as Parking Officer</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+function ErrorMsg({ msg }: { msg: string }) {
+  return (
+    <View style={styles.errorRow}>
+      <Icon name="alert-circle-outline" size={13} color={Colors.red} />
+      <Text style={styles.errorText}>{msg}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.white },
+  body: { padding: Spacing.lg + 4, paddingTop: Spacing.xxl * 2 },
 
-  header: {
+  brand: { alignItems: 'center', marginBottom: Spacing.xxl + 8 },
+  logoBox: {
+    width: 72, height: 72, borderRadius: 20,
     backgroundColor: Colors.primary,
-    paddingTop: Spacing.xxl + 20,
-    paddingBottom: Spacing.xxl + 8,
-    alignItems: 'center',
-    gap: Spacing.sm,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-  },
-  logoCircle: {
-    width: 72, height: 72, borderRadius: 36,
-    backgroundColor: Colors.white,
     alignItems: 'center', justifyContent: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
   },
-  appName: { fontSize: 22, fontWeight: '800', color: Colors.white, letterSpacing: 0.3 },
-  tagline: { fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
+  brandName: { fontSize: 22, fontWeight: '800', color: Colors.text },
+  brandSub:  { fontSize: 14, color: Colors.muted, marginTop: 4 },
 
-  body: {
-    paddingHorizontal: Spacing.lg + 4,
-    paddingTop: Spacing.xl + 8,
-    paddingBottom: Spacing.xl,
-  },
-  title: { ...Typography.h2, marginBottom: Spacing.xs },
-  subtitle: { ...Typography.small, marginBottom: Spacing.xl },
+  label: { fontSize: 13, fontWeight: '600', color: Colors.text, marginBottom: Spacing.xs, marginTop: Spacing.md },
 
-  inputWrapper: {
+  inputWrap: {
     flexDirection: 'row', alignItems: 'center',
     borderWidth: 1.5, borderColor: Colors.border,
-    borderRadius: BorderRadius.md, overflow: 'hidden',
-    backgroundColor: Colors.light,
+    borderRadius: BorderRadius.md, backgroundColor: Colors.light,
   },
   inputError: { borderColor: Colors.red },
-  prefix: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md + 2,
-    backgroundColor: Colors.light,
-  },
-  prefixText: { fontSize: 14, color: Colors.text, fontWeight: '600' },
-  divider: { width: 1, height: '100%', backgroundColor: Colors.border },
+  icon:    { paddingLeft: Spacing.md },
+  eyeBtn:  { padding: Spacing.md },
   input: {
-    flex: 1,
-    paddingHorizontal: Spacing.md,
+    flex: 1, paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.md + 2,
-    fontSize: 16, color: Colors.text,
-    fontWeight: '600', letterSpacing: 1.5,
+    fontSize: 15, color: Colors.text,
   },
 
-  errorRow: {
-    flexDirection: 'row', alignItems: 'center',
-    gap: 5, marginTop: Spacing.sm,
-  },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   errorText: { fontSize: 12, color: Colors.red, flex: 1 },
 
   btn: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.md + 2,
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: Spacing.sm,
-    marginTop: Spacing.lg,
+    backgroundColor: Colors.primary, borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md + 4,
+    alignItems: 'center', justifyContent: 'center',
+    marginTop: Spacing.xl,
   },
   btnDisabled: { backgroundColor: Colors.muted },
-  btnText: { fontSize: 15, fontWeight: '700', color: Colors.white },
+  btnText: { fontSize: 16, fontWeight: '700', color: Colors.white },
 
-  terms: {
-    fontSize: 11, color: Colors.muted,
-    textAlign: 'center', marginTop: Spacing.lg,
-    lineHeight: 17,
-  },
-  termsLink: { color: Colors.primary, fontWeight: '600' },
+  registerRow:    { flexDirection: 'row', justifyContent: 'center', marginTop: Spacing.lg },
+  registerPrompt: { fontSize: 14, color: Colors.muted },
+  registerLink:   { fontSize: 14, fontWeight: '700', color: Colors.primary },
 
-  footer: {
+  officerLink: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 5, paddingVertical: Spacing.md,
-    borderTopWidth: 1, borderTopColor: Colors.border,
+    gap: 6, marginTop: Spacing.xl, paddingVertical: Spacing.sm,
   },
-  footerText: { fontSize: 11, color: Colors.muted },
+  officerLinkText: { fontSize: 13, color: Colors.muted },
 });

@@ -1,14 +1,13 @@
 export type RootStackParamList = {
   // Role picker
   RolePicker: undefined;
-  // Driver auth
+  // Driver auth — National ID based (no OTP)
   Login: undefined;
-  OTP: { phone: string };
-  Register: { phone: string };
+  Register: undefined;
   // Driver main
   Main: undefined;
   ZoneDetail: { zoneCode: string };
-  PaymentConfirm: { zoneCode: string; vehicleType: '2w' | '4w'; durationMinutes: number };
+  PaymentConfirm: { zoneCode: string; vehicleType: '2w' | '4w'; durationMinutes: number; hourlyRate: number };
   Vehicles: undefined;
   // Officer auth
   OfficerLogin: undefined;
@@ -23,6 +22,7 @@ export type MainTabParamList = {
   Session: undefined;
   Wallet: undefined;
   History: undefined;
+  Profile: undefined;
 };
 
 export type OfficerTabParamList = {

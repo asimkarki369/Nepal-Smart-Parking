@@ -17,14 +17,28 @@ api.interceptors.request.use(async (config) => {
 
 // ─── AUTH ────────────────────────────────────────────────────────────────────
 export const authAPI = {
-  sendOTP: (phone: string) =>
-    api.post('/auth/send-otp', { phone }),
+  /**
+   * Sign in with National ID + password.
+   * Returns { token: string, user: User }
+   */
+  login: (data: { nationalId: string; password: string }) =>
+    api.post('/auth/login', data),
 
-  verifyOTP: (phone: string, otp: string) =>
-    api.post('/auth/verify-otp', { phone, otp }),
-
+  /**
+   * Register new account — National ID based, multi-vehicle.
+   * Returns { token: string, user: User }
+   */
   register: (data: {
-    fullName: string; phone: string; plateNumber: string; vehicleType: '2w' | '4w';
+    fullName:   string;
+    nationalId: string;
+    phone?:     string;
+    password:   string;
+    vehicles:   Array<{
+      plateNumber:  string;
+      vehicleType:  '2w' | '4w' | 'ev' | 'bus';
+      isPrimary:    boolean;
+      plateVerified:boolean;
+    }>;
   }) => api.post('/auth/register', data),
 
   logout: () => api.post('/auth/logout'),

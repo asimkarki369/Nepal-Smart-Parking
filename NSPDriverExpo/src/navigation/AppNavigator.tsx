@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors } from '@/utils/theme';
 import { useStore } from '@/store/useStore';
@@ -11,7 +12,6 @@ import { RootStackParamList, MainTabParamList, OfficerTabParamList } from './typ
 // Driver screens
 import RolePickerScreen    from '@/screens/RolePickerScreen';
 import LoginScreen         from '@/screens/auth/LoginScreen';
-import OTPScreen           from '@/screens/auth/OTPScreen';
 import RegisterScreen      from '@/screens/auth/RegisterScreen';
 import HomeScreen          from '@/screens/main/HomeScreen';
 import ZoneDetailScreen    from '@/screens/main/ZoneDetailScreen';
@@ -20,6 +20,7 @@ import SessionScreen       from '@/screens/main/SessionScreen';
 import HistoryScreen       from '@/screens/main/HistoryScreen';
 import WalletScreen        from '@/screens/main/WalletScreen';
 import VehiclesScreen      from '@/screens/main/VehiclesScreen';
+import ProfileScreen       from '@/screens/main/ProfileScreen';
 
 // Officer screens
 import OfficerLoginScreen    from '@/screens/officer/OfficerLoginScreen';
@@ -34,18 +35,31 @@ const OfficerTab  = createBottomTabNavigator<OfficerTabParamList>();
 // ── Driver main tabs ──────────────────────────────────────────────────────────
 function MainTabs() {
   const { activeSession } = useStore();
+  const insets = useSafeAreaInsets();
+  // TAB_H: icon + label area. Add insets.bottom so the bar sits ABOVE the
+  // phone's system navigation bar (≡ □ ◁) on every device.
+  const TAB_H = 56 + insets.bottom;
+
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: Colors.white, borderTopColor: Colors.border,
-          height: 64, paddingBottom: 8, paddingTop: 4,
-          elevation: 12, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12,
+          backgroundColor: Colors.white,
+          borderTopColor: Colors.border,
+          borderTopWidth: 1,
+          height: TAB_H,
+          paddingTop: 6,
+          // Push icon+label up; the remaining space below is reserved for system nav
+          paddingBottom: insets.bottom + 4,
+          elevation: 16,
+          shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 12,
         },
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.muted,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '700', marginTop: -2 },
+        // Tell React Navigation NOT to add extra safe-area padding (we handle it)
+        tabBarHideOnKeyboard: true,
       }}
     >
       <Tab.Screen
@@ -72,6 +86,11 @@ function MainTabs() {
         component={HistoryScreen}
         options={{ tabBarIcon: ({ color, size }) => <Icon name="history" color={color} size={size} /> }}
       />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ tabBarIcon: ({ color, size }) => <Icon name="account-circle-outline" color={color} size={size} /> }}
+      />
     </Tab.Navigator>
   );
 }
@@ -80,19 +99,25 @@ function MainTabs() {
 function OfficerTabs() {
   const { issuedFines, officer } = useStore();
   const todayFines = issuedFines.filter(f => f.officerId === officer?.id).length;
+  const insets = useSafeAreaInsets();
+  const TAB_H  = 56 + insets.bottom;
 
   return (
     <OfficerTab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: Colors.white, borderTopColor: Colors.border,
-          height: 64, paddingBottom: 8, paddingTop: 4,
-          elevation: 12,
+          backgroundColor: Colors.white,
+          borderTopColor: Colors.border, borderTopWidth: 1,
+          height: TAB_H,
+          paddingTop: 6,
+          paddingBottom: insets.bottom + 4,
+          elevation: 16,
         },
         tabBarActiveTintColor: '#E65100',
         tabBarInactiveTintColor: Colors.muted,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '700', marginTop: -2 },
+        tabBarHideOnKeyboard: true,
       }}
     >
       <OfficerTab.Screen
@@ -137,7 +162,6 @@ export default function AppNavigator() {
           <>
             <Stack.Screen name="RolePicker"    component={RolePickerScreen} />
             <Stack.Screen name="Login"         component={LoginScreen} />
-            <Stack.Screen name="OTP"           component={OTPScreen} />
             <Stack.Screen name="Register"      component={RegisterScreen} />
             <Stack.Screen name="OfficerLogin"  component={OfficerLoginScreen} />
           </>

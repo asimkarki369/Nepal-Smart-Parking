@@ -2,280 +2,34 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   StatusBar, ActivityIndicator, KeyboardAvoidingView,
-  Platform, ScrollView,
+  Platform, ScrollView, Alert,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { Colors, Spacing, BorderRadius, Typography } from '@/utils/theme';
+import { Colors, Spacing, BorderRadius } from '@/utils/theme';
 import { authAPI } from '@/services/api';
-import { useStore } from '@/store/useStore';
+import { useStore, Vehicle, VehicleType } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Register'>;
-type RegRoute = RouteProp<RootStackParamList, 'Register'>;
 
-const VEHICLE_TYPES = [
-  { value: '2w'  as const, label: 'Bike / Scooter',   icon: 'motorbike',      rate: 25 },
-  { value: '4w'  as const, label: 'Car / Jeep',       icon: 'car',            rate: 50 },
-  { value: 'ev'  as const, label: 'Electric Vehicle', icon: 'lightning-bolt', rate: 35 },
-  { value: 'bus' as const, label: 'Bus / Minibus',    icon: 'bus',            rate: 75 },
+const VEHICLE_TYPES: { value: VehicleType; label: string; icon: string; rate: number }[] = [
+  { value: '2w',  label: 'Bike / Scooter',   icon: 'motorbike',      rate: 25 },
+  { value: '4w',  label: 'Car / Jeep',       icon: 'car',            rate: 50 },
+  { value: 'ev',  label: 'Electric Vehicle', icon: 'lightning-bolt', rate: 35 },
+  { value: 'bus', label: 'Bus / Minibus',    icon: 'bus',            rate: 75 },
 ];
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
   return (
     <Text style={styles.label}>
-      {label}
-      {required && <Text style={styles.required}> *</Text>}
+      {label}{required && <Text style={{ color: Colors.red }}> *</Text>}
     </Text>
   );
 }
-
-export default function RegisterScreen() {
-  const navigation = useNavigation<NavProp>();
-  const route = useRoute<RegRoute>();
-  const { phone } = route.params;
-  const { setUser } = useStore();
-
-  const [fullName, setFullName] = useState('');
-  const [plateNumber, setPlateNumber] = useState('');
-  const [vehicleType, setVehicleType] = useState<'2w' | '4w' | 'ev' | 'bus'>('2w');
-  const [ownershipConfirmed, setOwnershipConfirmed] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const validate = (): boolean => {
-    const e: Record<string, string> = {};
-    if (!fullName.trim() || fullName.trim().length < 3) {
-      e.fullName = 'Full name must be at least 3 characters.';
-    }
-    // Nepal plate: Ba 1 Kha 1234 or similar — allow letters, digits, spaces
-    const plate = plateNumber.trim().toUpperCase();
-    if (!plate || plate.length < 4) {
-      e.plateNumber = 'Enter a valid vehicle plate number.';
-    }
-    if (!ownershipConfirmed) {
-      e.ownership = 'You must confirm this plate belongs to your vehicle.';
-    }
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleRegister = async () => {
-    if (!validate()) return;
-    setLoading(true);
-    try {
-      const res = await authAPI.register({
-        phone,
-        fullName: fullName.trim(),
-        plateNumber: plateNumber.trim().toUpperCase(),
-        vehicleType,
-      });
-      const { token, user } = res.data;
-      await AsyncStorage.setItem('auth_token', token);
-      setUser(user);
-    } catch (err: any) {
-      const status  = err?.response?.status;
-      const message = err?.response?.data?.message ?? '';
-
-      // Backend signals plate already registered → show specific error
-      if (status === 409 || message.toLowerCase().includes('plate')) {
-        setErrors(e => ({
-          ...e,
-          plateNumber:
-            'This plate number is already registered to another account. ' +
-            'If this is your vehicle, contact support.',
-        }));
-        setLoading(false);
-        return;
-      }
-
-      // Dev fallback — only when backend is unreachable (no response at all)
-      if (!err?.response) {
-        const devUser = {
-          id: `dev_${Date.now()}`,
-          fullName: fullName.trim(),
-          phone,
-          plateNumber: plateNumber.trim().toUpperCase(),
-          vehicleType,
-          walletBalance: 0,
-          plateVerified: false,   // unverified until backend confirms Bluebook
-        };
-        await AsyncStorage.setItem('auth_token', 'dev_token');
-        setUser(devUser);
-      } else {
-        setErrors(e => ({
-          ...e,
-          plateNumber: message || 'Registration failed. Please try again.',
-        }));
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const isFormReady = fullName.trim().length >= 3 && plateNumber.trim().length >= 4 && ownershipConfirmed;
-
-  return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Icon name="arrow-left" size={22} color={Colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create Account</Text>
-        <View style={{ width: 36 }} />
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.body}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Progress indicator */}
-        <View style={styles.progressRow}>
-          <View style={styles.stepDone}>
-            <Icon name="check" size={12} color={Colors.white} />
-          </View>
-          <View style={styles.progressLine} />
-          <View style={styles.stepDone}>
-            <Icon name="check" size={12} color={Colors.white} />
-          </View>
-          <View style={styles.progressLine} />
-          <View style={styles.stepActive}>
-            <Text style={styles.stepActiveText}>3</Text>
-          </View>
-        </View>
-        <Text style={styles.progressLabel}>Step 3 of 3 — Your details</Text>
-
-        {/* Phone badge (read-only) */}
-        <View style={styles.phoneBadge}>
-          <Icon name="check-circle" size={16} color={Colors.green} />
-          <Text style={styles.phoneBadgeText}>Verified: +977 {phone}</Text>
-        </View>
-
-        {/* Full name */}
-        <FieldLabel label="Full Name" required />
-        <View style={[styles.inputWrapper, errors.fullName ? styles.inputError : null]}>
-          <Icon name="account-outline" size={18} color={Colors.muted} style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="As on your ID (e.g. Ram Prasad Sharma)"
-            placeholderTextColor={Colors.muted}
-            value={fullName}
-            onChangeText={t => { setFullName(t); setErrors(e => ({ ...e, fullName: '' })); }}
-            autoCapitalize="words"
-            returnKeyType="next"
-          />
-        </View>
-        {errors.fullName ? <ErrorMsg msg={errors.fullName} /> : null}
-
-        {/* Plate number */}
-        <FieldLabel label="Vehicle Plate Number" required />
-        <View style={[styles.inputWrapper, errors.plateNumber ? styles.inputError : null]}>
-          <Icon name="card-text-outline" size={18} color={Colors.muted} style={styles.inputIcon} />
-          <TextInput
-            style={[styles.input, styles.plateInput]}
-            placeholder="e.g. BA 1 KHA 1234"
-            placeholderTextColor={Colors.muted}
-            value={plateNumber}
-            onChangeText={t => { setPlateNumber(t); setErrors(e => ({ ...e, plateNumber: '' })); }}
-            autoCapitalize="characters"
-            returnKeyType="done"
-          />
-        </View>
-        {errors.plateNumber ? <ErrorMsg msg={errors.plateNumber} /> : null}
-        <Text style={styles.hint}>Nepal Bagmati format: BA 1 KHA 1234</Text>
-
-        {/* Ownership confirmation */}
-        <TouchableOpacity
-          style={styles.checkRow}
-          onPress={() => {
-            setOwnershipConfirmed(v => !v);
-            setErrors(e => ({ ...e, ownership: '' }));
-          }}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.checkbox, ownershipConfirmed && styles.checkboxActive]}>
-            {ownershipConfirmed && <Icon name="check" size={12} color={Colors.white} />}
-          </View>
-          <Text style={styles.checkText}>
-            I confirm this plate number belongs to <Text style={{ fontWeight: '700' }}>my vehicle</Text>.
-            Entering another person's plate is an offence and fines will be traced back to this account.
-          </Text>
-        </TouchableOpacity>
-        {errors.ownership ? <ErrorMsg msg={errors.ownership} /> : null}
-
-        {/* Vehicle type */}
-        <FieldLabel label="Vehicle Type" required />
-        <View style={styles.vehicleRow}>
-          {VEHICLE_TYPES.map(vt => (
-            <TouchableOpacity
-              key={vt.value}
-              style={[styles.vehicleCard, vehicleType === vt.value && styles.vehicleCardActive]}
-              onPress={() => setVehicleType(vt.value)}
-              activeOpacity={0.8}
-            >
-              <Icon
-                name={vt.icon}
-                size={28}
-                color={vehicleType === vt.value ? Colors.primary : Colors.muted}
-              />
-              <Text style={[styles.vehicleLabel, vehicleType === vt.value && styles.vehicleLabelActive]}>
-                {vt.label}
-              </Text>
-              {vehicleType === vt.value && (
-                <View style={styles.vehicleCheck}>
-                  <Icon name="check" size={10} color={Colors.white} />
-                </View>
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Rate info */}
-        <View style={styles.rateCard}>
-          <Icon name="information-outline" size={15} color={Colors.primary} />
-          <Text style={styles.rateText}>
-            {vehicleType === '4w' ? 'Car/Jeep (petrol/diesel): Rs 50/hr + 10% service fee'
-              : vehicleType === 'ev' ? 'Electric Vehicle: Rs 35/hr + 10% service fee'
-              : vehicleType === 'bus' ? 'Bus/Minivan/Minibus: Rs 75/hr + 10% service fee'
-              : 'Bike/Scooter: Rs 25/hr + 10% service fee'}
-          </Text>
-        </View>
-
-        {/* Submit */}
-        <TouchableOpacity
-          style={[styles.btn, (!isFormReady || loading) && styles.btnDisabled]}
-          onPress={handleRegister}
-          disabled={!isFormReady || loading}
-          activeOpacity={0.85}
-        >
-          {loading ? (
-            <ActivityIndicator color={Colors.white} size="small" />
-          ) : (
-            <>
-              <Text style={styles.btnText}>Complete Registration</Text>
-              <Icon name="arrow-right" size={18} color={Colors.white} />
-            </>
-          )}
-        </TouchableOpacity>
-
-        <Text style={styles.terms}>
-          Your vehicle details are used only for parking session management.
-        </Text>
-      </ScrollView>
-    </KeyboardAvoidingView>
-  );
-}
-
 function ErrorMsg({ msg }: { msg: string }) {
   return (
     <View style={styles.errorRow}>
@@ -285,128 +39,579 @@ function ErrorMsg({ msg }: { msg: string }) {
   );
 }
 
+// ── Nepal license plate mini-widget ──────────────────────────────────────────
+function PlateBadge({ plate, type }: { plate: string; type: VehicleType }) {
+  const typeIcon = VEHICLE_TYPES.find(v => v.value === type)?.icon ?? 'car';
+  return (
+    <View style={styles.plateBadge}>
+      <Icon name={typeIcon as any} size={16} color={Colors.primary} />
+      <View style={styles.plateBox}>
+        <View style={styles.plateBlueBar} />
+        <Text style={styles.plateText}>{plate}</Text>
+      </View>
+    </View>
+  );
+}
+
+export default function RegisterScreen() {
+  const navigation = useNavigation<NavProp>();
+  const { setUser } = useStore();
+
+  // ── Step state ────────────────────────────────────────────────────────────
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+
+  // Step 1 — personal details
+  const [fullName,   setFullName]   = useState('');
+  const [nationalId, setNationalId] = useState('');
+  const [phone,      setPhone]      = useState('');
+  const [password,   setPassword]   = useState('');
+  const [showPass,   setShowPass]   = useState(false);
+
+  // Step 2 — vehicles
+  const [vehicles,     setVehicles]     = useState<Omit<Vehicle, 'id'>[]>([]);
+  const [newPlate,     setNewPlate]     = useState('');
+  const [newType,      setNewType]      = useState<VehicleType>('4w');
+  const [ownerConfirm, setOwnerConfirm] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+  const [errors,  setErrors]  = useState<Record<string, string>>({});
+
+  // ── Step 1 validation ─────────────────────────────────────────────────────
+  const validateStep1 = () => {
+    const e: Record<string, string> = {};
+    if (fullName.trim().length < 3)   e.fullName   = 'Full name must be at least 3 characters.';
+    if (nationalId.trim().length < 5) e.nationalId = 'Enter a valid National ID number.';
+    if (password.length < 6)          e.password   = 'Password must be at least 6 characters.';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  // ── Add vehicle ───────────────────────────────────────────────────────────
+  const addVehicle = () => {
+    const plate = newPlate.trim().toUpperCase();
+    if (plate.length < 4) {
+      setErrors(e => ({ ...e, plate: 'Enter a valid plate number (e.g. BA 1 KHA 1234).' }));
+      return;
+    }
+    if (!ownerConfirm) {
+      setErrors(e => ({ ...e, plate: 'Please confirm this plate belongs to you.' }));
+      return;
+    }
+    if (vehicles.some(v => v.plateNumber === plate)) {
+      setErrors(e => ({ ...e, plate: 'This plate is already added.' }));
+      return;
+    }
+    setVehicles(prev => [
+      ...prev,
+      { plateNumber: plate, vehicleType: newType, isPrimary: prev.length === 0, plateVerified: false },
+    ]);
+    setNewPlate('');
+    setOwnerConfirm(false);
+    setErrors(e => ({ ...e, plate: '' }));
+  };
+
+  const removeVehicle = (plate: string) => {
+    setVehicles(prev => {
+      const filtered = prev.filter(v => v.plateNumber !== plate);
+      // Reassign primary to first if needed
+      if (filtered.length > 0 && !filtered.some(v => v.isPrimary)) {
+        filtered[0] = { ...filtered[0], isPrimary: true };
+      }
+      return filtered;
+    });
+  };
+
+  const setPrimary = (plate: string) => {
+    setVehicles(prev => prev.map(v => ({ ...v, isPrimary: v.plateNumber === plate })));
+  };
+
+  // ── Final submit ──────────────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (vehicles.length === 0) {
+      Alert.alert('Add a Vehicle', 'Please add at least one vehicle to continue.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await authAPI.register({
+        fullName: fullName.trim(),
+        nationalId: nationalId.trim(),
+        phone: phone.trim() || undefined,
+        password,
+        vehicles,
+      } as any);
+      const { token, user } = res.data;
+      await AsyncStorage.setItem('auth_token', token);
+      setUser(user);
+    } catch {
+      // Dev fallback
+      const devUser = {
+        id:         `dev_${Date.now()}`,
+        fullName:   fullName.trim(),
+        nationalId: nationalId.trim(),
+        phone:      phone.trim() || undefined,
+        vehicles:   vehicles.map((v, i) => ({ ...v, id: `v_${i}` })),
+        walletBalance: 0,
+      };
+      await AsyncStorage.setItem('auth_token', 'dev_token');
+      await AsyncStorage.setItem('nsp_user', JSON.stringify(devUser));
+      setUser(devUser);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Progress indicator ─────────────────────────────────────────────────────
+  const STEPS = ['Personal Details', 'Vehicles', 'Review'];
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => step === 1 ? navigation.goBack() : setStep(s => (s - 1) as any)}
+        >
+          <Icon name="arrow-left" size={22} color={Colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Create Account</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* Step progress */}
+      <View style={styles.stepBar}>
+        {STEPS.map((label, i) => (
+          <View key={i} style={styles.stepItem}>
+            <View style={[styles.stepDot, i + 1 <= step && styles.stepDotActive]}>
+              {i + 1 < step
+                ? <Icon name="check" size={12} color={Colors.white} />
+                : <Text style={styles.stepDotText}>{i + 1}</Text>
+              }
+            </View>
+            <Text style={[styles.stepLabel, i + 1 <= step && styles.stepLabelActive]}>{label}</Text>
+            {i < STEPS.length - 1 && (
+              <View style={[styles.stepLine, i + 1 < step && styles.stepLineActive]} />
+            )}
+          </View>
+        ))}
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ══════════ STEP 1 — Personal Details ══════════ */}
+        {step === 1 && (
+          <>
+            <Text style={styles.stepTitle}>Personal Information</Text>
+            <Text style={styles.stepDesc}>Your details are used to verify your identity for parking and fines.</Text>
+
+            <FieldLabel label="Full Name" required />
+            <View style={[styles.inputWrap, errors.fullName && styles.inputError]}>
+              <Icon name="account-outline" size={18} color={Colors.muted} style={styles.icon} />
+              <TextInput
+                style={styles.input}
+                placeholder="As on your citizenship card"
+                placeholderTextColor={Colors.muted}
+                value={fullName}
+                onChangeText={t => { setFullName(t); setErrors(e => ({ ...e, fullName: '' })); }}
+                autoCapitalize="words"
+              />
+            </View>
+            {errors.fullName ? <ErrorMsg msg={errors.fullName} /> : null}
+
+            <FieldLabel label="National ID / Citizenship Number" required />
+            <View style={[styles.inputWrap, errors.nationalId && styles.inputError]}>
+              <Icon name="card-account-details-outline" size={18} color={Colors.muted} style={styles.icon} />
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 1234-56789-01234"
+                placeholderTextColor={Colors.muted}
+                value={nationalId}
+                onChangeText={t => { setNationalId(t); setErrors(e => ({ ...e, nationalId: '' })); }}
+                autoCapitalize="none"
+              />
+            </View>
+            {errors.nationalId ? <ErrorMsg msg={errors.nationalId} /> : null}
+
+            <FieldLabel label="Phone Number" />
+            <View style={styles.inputWrap}>
+              <Icon name="phone-outline" size={18} color={Colors.muted} style={styles.icon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Optional — for fine notifications"
+                placeholderTextColor={Colors.muted}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            <FieldLabel label="Password" required />
+            <View style={[styles.inputWrap, errors.password && styles.inputError]}>
+              <Icon name="lock-outline" size={18} color={Colors.muted} style={styles.icon} />
+              <TextInput
+                style={styles.input}
+                placeholder="At least 6 characters"
+                placeholderTextColor={Colors.muted}
+                value={password}
+                onChangeText={t => { setPassword(t); setErrors(e => ({ ...e, password: '' })); }}
+                secureTextEntry={!showPass}
+              />
+              <TouchableOpacity onPress={() => setShowPass(v => !v)} style={styles.eyeBtn}>
+                <Icon name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.muted} />
+              </TouchableOpacity>
+            </View>
+            {errors.password ? <ErrorMsg msg={errors.password} /> : null}
+
+            <TouchableOpacity
+              style={[styles.btn, (fullName.trim().length < 3 || nationalId.trim().length < 5 || password.length < 6) && styles.btnDisabled]}
+              onPress={() => { if (validateStep1()) setStep(2); }}
+            >
+              <Text style={styles.btnText}>Next — Add Vehicles</Text>
+              <Icon name="arrow-right" size={18} color={Colors.white} />
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* ══════════ STEP 2 — Vehicle ══════════ */}
+        {step === 2 && (
+          <>
+            <Text style={styles.stepTitle}>Your Vehicle</Text>
+            <Text style={styles.stepDesc}>
+              Add your primary vehicle to get started. You can add more number plates anytime from your Profile.
+            </Text>
+
+            {vehicles.length > 0 ? (
+              /* ── Vehicle confirmed — show summary and continue ── */
+              <>
+                <View style={styles.addedCard}>
+                  <Icon name="check-circle" size={22} color={Colors.green} />
+                  <View style={{ flex: 1 }}>
+                    <PlateBadge plate={vehicles[0].plateNumber} type={vehicles[0].vehicleType} />
+                    <Text style={styles.addedLabel}>
+                      {VEHICLE_TYPES.find(v => v.value === vehicles[0].vehicleType)?.label}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => { setVehicles([]); setOwnerConfirm(false); }}>
+                    <Text style={styles.changeLink}>Change</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.laterNote}>
+                  <Icon name="information-outline" size={14} color={Colors.primary} />
+                  <Text style={styles.laterNoteText}>
+                    Have more vehicles? Add them later from <Text style={{ fontWeight: '700' }}>Profile → My Vehicles</Text>.
+                  </Text>
+                </View>
+
+                <TouchableOpacity style={styles.btn} onPress={() => setStep(3)}>
+                  <Text style={styles.btnText}>Next — Review</Text>
+                  <Icon name="arrow-right" size={18} color={Colors.white} />
+                </TouchableOpacity>
+              </>
+            ) : (
+              /* ── Add first vehicle form ── */
+              <View style={styles.addVehicleCard}>
+                {/* Vehicle type picker */}
+                <FieldLabel label="Vehicle Type" required />
+                <View style={styles.vehicleTypeGrid}>
+                  {VEHICLE_TYPES.map(vt => (
+                    <TouchableOpacity
+                      key={vt.value}
+                      style={[styles.typeCard, newType === vt.value && styles.typeCardActive]}
+                      onPress={() => setNewType(vt.value)}
+                    >
+                      <Icon name={vt.icon as any} size={22} color={newType === vt.value ? Colors.white : Colors.muted} />
+                      <Text style={[styles.typeCardLabel, newType === vt.value && { color: Colors.white }]}>{vt.label}</Text>
+                      <Text style={[styles.typeCardRate, newType === vt.value && { color: 'rgba(255,255,255,0.8)' }]}>Rs {vt.rate}/hr</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Plate number */}
+                <FieldLabel label="Number Plate" required />
+                <View style={[styles.inputWrap, errors.plate && styles.inputError]}>
+                  <Icon name="card-text-outline" size={18} color={Colors.muted} style={styles.icon} />
+                  <TextInput
+                    style={[styles.input, styles.plateInput]}
+                    placeholder="e.g. BA 1 KHA 1234"
+                    placeholderTextColor={Colors.muted}
+                    value={newPlate}
+                    onChangeText={t => { setNewPlate(t); setErrors(e => ({ ...e, plate: '' })); }}
+                    autoCapitalize="characters"
+                  />
+                </View>
+                <Text style={styles.hint}>Nepal format: BA 1 KHA 1234</Text>
+                {errors.plate ? <ErrorMsg msg={errors.plate} /> : null}
+
+                {/* Ownership confirmation */}
+                <TouchableOpacity
+                  style={styles.checkRow}
+                  onPress={() => setOwnerConfirm(v => !v)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.checkbox, ownerConfirm && styles.checkboxActive]}>
+                    {ownerConfirm && <Icon name="check" size={12} color={Colors.white} />}
+                  </View>
+                  <Text style={styles.checkText}>
+                    I confirm this plate <Text style={{ fontWeight: '700' }}>belongs to me</Text>. Entering another person's plate is an offence.
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.addBtn, (!newPlate.trim() || !ownerConfirm) && styles.addBtnDisabled]}
+                  onPress={addVehicle}
+                  disabled={!newPlate.trim() || !ownerConfirm}
+                >
+                  <Icon name="check" size={18} color={newPlate.trim() && ownerConfirm ? Colors.primary : Colors.muted} />
+                  <Text style={[styles.addBtnText, (!newPlate.trim() || !ownerConfirm) && { color: Colors.muted }]}>
+                    Confirm Vehicle
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        )}
+
+        {/* ══════════ STEP 3 — Review & Submit ══════════ */}
+        {step === 3 && (
+          <>
+            <Text style={styles.stepTitle}>Review & Confirm</Text>
+            <Text style={styles.stepDesc}>Please review your details before creating your account.</Text>
+
+            {/* Personal summary card */}
+            <View style={styles.reviewCard}>
+              <Text style={styles.reviewCardTitle}>Personal Details</Text>
+              <ReviewRow icon="account-outline"           label="Full Name"   value={fullName} />
+              <ReviewRow icon="card-account-details-outline" label="National ID" value={nationalId} />
+              {phone ? <ReviewRow icon="phone-outline" label="Phone" value={phone} /> : null}
+            </View>
+
+            {/* Vehicles summary card */}
+            <View style={styles.reviewCard}>
+              <Text style={styles.reviewCardTitle}>Vehicles ({vehicles.length})</Text>
+              {vehicles.map(v => (
+                <View key={v.plateNumber} style={styles.reviewVehicleRow}>
+                  <PlateBadge plate={v.plateNumber} type={v.vehicleType} />
+                  {v.isPrimary && (
+                    <View style={styles.primaryBadge}><Text style={styles.primaryBadgeText}>Primary</Text></View>
+                  )}
+                </View>
+              ))}
+            </View>
+
+            {/* Security notice */}
+            <View style={styles.noticeBanner}>
+              <Icon name="shield-check-outline" size={16} color={Colors.primary} />
+              <Text style={styles.noticeText}>
+                Your National ID is used to verify identity during parking checks and fine resolution. It is stored securely.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.btn, loading && styles.btnDisabled]}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color={Colors.white} size="small" />
+                : <>
+                    <Text style={styles.btnText}>Create Account</Text>
+                    <Icon name="check" size={18} color={Colors.white} />
+                  </>
+              }
+            </TouchableOpacity>
+
+            <Text style={styles.terms}>
+              By registering you agree to NSP's terms of service and privacy policy.
+            </Text>
+          </>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+function ReviewRow({ icon, label, value }: { icon: string; label: string; value: string }) {
+  return (
+    <View style={styles.reviewRow}>
+      <Icon name={icon as any} size={15} color={Colors.muted} />
+      <View>
+        <Text style={styles.reviewLabel}>{label}</Text>
+        <Text style={styles.reviewValue}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.white },
 
   header: {
-    backgroundColor: Colors.primary,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: Spacing.xxl + 8, paddingBottom: Spacing.md,
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.lg, paddingTop: Spacing.xxl,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: Colors.white },
+  backBtn:     { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.text },
 
-  body: {
-    paddingHorizontal: Spacing.lg + 4,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xl,
+  // Step progress bar
+  stepBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: Spacing.md, paddingHorizontal: Spacing.lg,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+    gap: 0,
   },
-
-  progressRow: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 0, marginBottom: Spacing.xs,
-  },
-  stepDone: {
+  stepItem:      { flexDirection: 'row', alignItems: 'center' },
+  stepDot: {
     width: 24, height: 24, borderRadius: 12,
-    backgroundColor: Colors.green,
+    backgroundColor: Colors.border,
     alignItems: 'center', justifyContent: 'center',
   },
-  stepActive: {
-    width: 24, height: 24, borderRadius: 12,
-    backgroundColor: Colors.primary,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  stepActiveText: { fontSize: 11, fontWeight: '700', color: Colors.white },
-  progressLine: { width: 32, height: 2, backgroundColor: Colors.green },
-  progressLabel: {
-    fontSize: 12, color: Colors.muted, textAlign: 'center', marginBottom: Spacing.lg,
-  },
+  stepDotActive:  { backgroundColor: Colors.primary },
+  stepDotText:    { fontSize: 11, fontWeight: '700', color: Colors.muted },
+  stepLabel:      { fontSize: 11, color: Colors.muted, marginLeft: 4, marginRight: 4 },
+  stepLabelActive:{ color: Colors.primary, fontWeight: '700' },
+  stepLine:       { width: 24, height: 2, backgroundColor: Colors.border },
+  stepLineActive: { backgroundColor: Colors.primary },
 
-  phoneBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#E8F5E9', borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
-    marginBottom: Spacing.lg,
-  },
-  phoneBadgeText: { fontSize: 13, color: Colors.text, fontWeight: '600' },
+  body: { padding: Spacing.lg, paddingBottom: Spacing.xxl },
+
+  stepTitle: { fontSize: 20, fontWeight: '800', color: Colors.text, marginBottom: 4 },
+  stepDesc:  { fontSize: 13, color: Colors.muted, marginBottom: Spacing.lg, lineHeight: 18 },
 
   label: { fontSize: 13, fontWeight: '600', color: Colors.text, marginBottom: Spacing.xs, marginTop: Spacing.md },
-  required: { color: Colors.red },
 
-  inputWrapper: {
+  inputWrap: {
     flexDirection: 'row', alignItems: 'center',
     borderWidth: 1.5, borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.light,
+    borderRadius: BorderRadius.md, backgroundColor: Colors.light,
   },
   inputError: { borderColor: Colors.red },
-  inputIcon: { paddingLeft: Spacing.md },
+  icon:    { paddingLeft: Spacing.md },
+  eyeBtn:  { padding: Spacing.md },
   input: {
-    flex: 1,
-    paddingHorizontal: Spacing.sm,
+    flex: 1, paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.md + 2,
     fontSize: 15, color: Colors.text,
   },
-  plateInput: { fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' },
+  plateInput: { fontWeight: '700', letterSpacing: 1 },
+  hint: { fontSize: 11, color: Colors.muted, marginTop: 3 },
 
-  hint: { fontSize: 11, color: Colors.muted, marginTop: 4 },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  errorText: { fontSize: 12, color: Colors.red, flex: 1 },
+
+  btn: {
+    backgroundColor: Colors.primary, borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md + 2,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: Spacing.sm, marginTop: Spacing.xl,
+  },
+  btnDisabled: { backgroundColor: Colors.muted },
+  btnText: { fontSize: 15, fontWeight: '700', color: Colors.white },
+
+  // Vehicles
+  addedCard: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+    backgroundColor: Colors.greenLight, borderRadius: BorderRadius.lg,
+    padding: Spacing.md, borderWidth: 1, borderColor: Colors.green,
+    marginBottom: Spacing.md,
+  },
+  addedLabel: { fontSize: 12, color: Colors.muted, marginTop: 4 },
+  changeLink: { fontSize: 13, fontWeight: '700', color: Colors.primary },
+
+  laterNote: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    backgroundColor: Colors.primaryLight, borderRadius: BorderRadius.sm,
+    padding: Spacing.sm + 2, marginBottom: Spacing.sm,
+  },
+  laterNoteText: { fontSize: 12, color: Colors.primary, flex: 1, lineHeight: 17 },
+
+  primaryBadge: {
+    backgroundColor: Colors.primaryLight, paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: BorderRadius.pill,
+  },
+  primaryBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.primary },
+  setPrimaryBtn:    { fontSize: 12, color: Colors.primary, fontWeight: '600' },
+
+  addVehicleCard: {
+    backgroundColor: Colors.light, borderRadius: BorderRadius.lg,
+    padding: Spacing.md, borderWidth: 1, borderColor: Colors.border,
+    marginTop: Spacing.sm,
+  },
+  addVehicleTitle: { fontSize: 14, fontWeight: '700', color: Colors.text, marginBottom: Spacing.sm },
+
+  vehicleTypeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: Spacing.sm },
+  typeCard: {
+    width: '47%', alignItems: 'center', gap: 4, paddingVertical: 10,
+    borderRadius: BorderRadius.md, borderWidth: 1.5, borderColor: Colors.border,
+    backgroundColor: Colors.white,
+  },
+  typeCardActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  typeCardLabel:  { fontSize: 11, fontWeight: '700', color: Colors.muted, textAlign: 'center' },
+  typeCardRate:   { fontSize: 10, color: Colors.muted },
 
   checkRow: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm,
-    marginTop: Spacing.md,
-    backgroundColor: '#FFF8E1',
-    borderRadius: BorderRadius.sm,
-    padding: Spacing.sm + 2,
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    backgroundColor: '#FFF8E1', borderRadius: BorderRadius.sm,
+    padding: Spacing.sm + 2, marginTop: Spacing.sm,
     borderWidth: 1, borderColor: '#FFE082',
   },
   checkbox: {
     width: 20, height: 20, borderRadius: 4,
     borderWidth: 2, borderColor: Colors.muted,
-    alignItems: 'center', justifyContent: 'center',
-    marginTop: 1, flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
   },
   checkboxActive: { borderColor: Colors.primary, backgroundColor: Colors.primary },
-  checkText: { fontSize: 12, color: Colors.text, flex: 1, lineHeight: 17 },
+  checkText:      { fontSize: 12, color: Colors.text, flex: 1, lineHeight: 17 },
 
-  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  errorText: { fontSize: 12, color: Colors.red, flex: 1 },
+  addBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    borderWidth: 1.5, borderColor: Colors.primary, borderRadius: BorderRadius.md,
+    paddingVertical: 10, marginTop: Spacing.md, backgroundColor: Colors.primaryLight,
+  },
+  addBtnDisabled: { borderColor: Colors.border, backgroundColor: Colors.light },
+  addBtnText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
 
-  vehicleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  vehicleCard: {
-    width: '47%',
-    flex: 1, borderWidth: 1.5, borderColor: Colors.border,
-    borderRadius: BorderRadius.md, padding: Spacing.md,
-    alignItems: 'center', gap: Spacing.xs,
-    backgroundColor: Colors.light, position: 'relative',
+  // Plate badge
+  plateBadge:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  plateBox: {
+    flexDirection: 'row', alignItems: 'stretch',
+    borderWidth: 1.5, borderColor: '#CCC',
+    borderRadius: 5, overflow: 'hidden', backgroundColor: Colors.white,
   },
-  vehicleCardActive: { borderColor: Colors.primary, backgroundColor: '#EEF2FB' },
-  vehicleLabel: { fontSize: 11, color: Colors.muted, textAlign: 'center', fontWeight: '500' },
-  vehicleLabelActive: { color: Colors.primary, fontWeight: '700' },
-  vehicleCheck: {
-    position: 'absolute', top: 6, right: 6,
-    width: 16, height: 16, borderRadius: 8,
-    backgroundColor: Colors.primary,
-    alignItems: 'center', justifyContent: 'center',
+  plateBlueBar: { width: 5, backgroundColor: '#1A56DB' },
+  plateText: {
+    paddingHorizontal: 10, paddingVertical: 4,
+    fontSize: 14, fontWeight: '800', color: Colors.text, letterSpacing: 1,
   },
 
-  rateCard: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 6,
-    backgroundColor: '#EEF2FB', borderRadius: BorderRadius.sm,
-    padding: Spacing.sm + 2, marginTop: Spacing.sm,
+  // Review
+  reviewCard: {
+    backgroundColor: Colors.light, borderRadius: BorderRadius.lg,
+    padding: Spacing.md, borderWidth: 1, borderColor: Colors.border,
+    marginBottom: Spacing.md,
   },
-  rateText: { fontSize: 12, color: Colors.primary, flex: 1, lineHeight: 18 },
+  reviewCardTitle: { fontSize: 13, fontWeight: '700', color: Colors.muted, marginBottom: Spacing.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
+  reviewRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
+  reviewLabel:     { fontSize: 11, color: Colors.muted },
+  reviewValue:     { fontSize: 14, fontWeight: '600', color: Colors.text },
+  reviewVehicleRow:{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: Spacing.sm },
 
-  btn: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.md + 2,
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: Spacing.sm,
-    marginTop: Spacing.xl,
+  noticeBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    backgroundColor: Colors.primaryLight, borderRadius: BorderRadius.sm,
+    padding: Spacing.md, marginBottom: Spacing.sm,
   },
-  btnDisabled: { backgroundColor: Colors.muted },
-  btnText: { fontSize: 15, fontWeight: '700', color: Colors.white },
+  noticeText: { fontSize: 12, color: Colors.primary, flex: 1, lineHeight: 17 },
 
   terms: { fontSize: 11, color: Colors.muted, textAlign: 'center', marginTop: Spacing.md, lineHeight: 16 },
 });
