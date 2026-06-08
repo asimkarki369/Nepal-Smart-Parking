@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   StatusBar, ActivityIndicator, KeyboardAvoidingView,
@@ -76,6 +76,10 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [errors,  setErrors]  = useState<Record<string, string>>({});
 
+  // Prevent setState on unmounted component (New Architecture crashes on this)
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   // ── Step 1 validation ─────────────────────────────────────────────────────
   const validateStep1 = () => {
     const e: Record<string, string> = {};
@@ -131,33 +135,47 @@ export default function RegisterScreen() {
       Alert.alert('Add a Vehicle', 'Please add at least one vehicle to continue.');
       return;
     }
+    if (!mountedRef.current) return;
     setLoading(true);
+
+    const doLogin = (user: any, token: string) => {
+      // setUser triggers navigation → component unmounts.
+      // We must NOT call setLoading(false) after this point.
+      AsyncStorage.setItem('auth_token', token).finally(() => {
+        if (mountedRef.current) setUser(user);
+        else setUser(user); // still call setUser even if unmounted — store update is fine
+      });
+    };
+
     try {
       const res = await authAPI.register({
-        fullName: fullName.trim(),
+        fullName:  fullName.trim(),
         nationalId: nationalId.trim(),
-        phone: phone.trim() || undefined,
+        phone:     phone.trim() || undefined,
         password,
         vehicles,
       } as any);
-      const { token, user } = res.data;
-      await AsyncStorage.setItem('auth_token', token);
-      setUser(user);
+      doLogin(res.data.user, res.data.token);
     } catch {
-      // Dev fallback
-      const devUser = {
-        id:         `dev_${Date.now()}`,
-        fullName:   fullName.trim(),
-        nationalId: nationalId.trim(),
-        phone:      phone.trim() || undefined,
-        vehicles:   vehicles.map((v, i) => ({ ...v, id: `v_${i}` })),
-        walletBalance: 0,
-      };
-      await AsyncStorage.setItem('auth_token', 'dev_token');
-      await AsyncStorage.setItem('nsp_user', JSON.stringify(devUser));
-      setUser(devUser);
-    } finally {
-      setLoading(false);
+      // Dev fallback — backend not live yet
+      try {
+        const devUser = {
+          id:           `dev_${Date.now()}`,
+          fullName:     fullName.trim(),
+          nationalId:   nationalId.trim(),
+          phone:        phone.trim() || undefined,
+          vehicles:     vehicles.map((v, i) => ({ ...v, id: `v_${i}` })),
+          walletBalance: 0,
+        };
+        await AsyncStorage.setItem('nsp_user', JSON.stringify(devUser));
+        doLogin(devUser, 'dev_token');
+      } catch {
+        // Only reach here if AsyncStorage itself fails
+        if (mountedRef.current) {
+          setLoading(false);
+          Alert.alert('Error', 'Could not save account data. Please try again.');
+        }
+      }
     }
   };
 

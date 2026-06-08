@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   StatusBar, ActivityIndicator, KeyboardAvoidingView,
@@ -35,6 +35,10 @@ export default function LoginScreen() {
   const [showPass,    setShowPass]    = useState(false);
   const [loading,     setLoading]     = useState(false);
   const [errors,      setErrors]      = useState<Record<string, string>>({});
+
+  // Mounted guard — prevents setState on unmounted component (New Architecture crash)
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   // Biometric state
   const [bioAvailable, setBioAvailable] = useState(false);
@@ -101,29 +105,35 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!validate()) return;
+    if (!mountedRef.current) return;
     setLoading(true);
     try {
       const res = await authAPI.login({ nationalId: nationalId.trim(), password });
       const { token, user } = res.data;
       await AsyncStorage.setItem('auth_token', token);
+      // setUser unmounts this component — do NOT call setLoading after this
       setUser(user);
       offerBiometricEnroll(nationalId.trim(), password);
     } catch {
-      const saved = await AsyncStorage.getItem('nsp_user');
-      if (saved) {
-        const user = JSON.parse(saved);
-        if (user.nationalId === nationalId.trim()) {
-          await AsyncStorage.setItem('auth_token', 'dev_token');
-          setUser(user);
-          offerBiometricEnroll(nationalId.trim(), password);
+      try {
+        const saved = await AsyncStorage.getItem('nsp_user');
+        if (saved) {
+          const user = JSON.parse(saved);
+          if (user.nationalId === nationalId.trim()) {
+            await AsyncStorage.setItem('auth_token', 'dev_token');
+            setUser(user);
+            offerBiometricEnroll(nationalId.trim(), password);
+            // component unmounts after setUser — stop here
+            return;
+          }
+          if (mountedRef.current) setErrors({ nationalId: 'National ID not found. Please register first.' });
         } else {
-          setErrors({ nationalId: 'National ID not found. Please register first.' });
+          if (mountedRef.current) setErrors({ nationalId: 'Account not found. Please register first.' });
         }
-      } else {
-        setErrors({ nationalId: 'Account not found. Please register first.' });
+      } catch {
+        if (mountedRef.current) setErrors({ nationalId: 'Something went wrong. Please try again.' });
       }
-    } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 
