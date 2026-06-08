@@ -18,6 +18,8 @@ LogBox.ignoreLogs([
   'Non-serializable values were found in the navigation state',
   // Require cycle from expo internals
   'Require cycle:',
+  // New Architecture (RN 0.85+) — LayoutAnimation is a no-op in Fabric, expected
+  'setLayoutAnimationEnabledExperimental',
 ]);
 
 // ── Error boundary — catches render crashes and shows a message ───────────────
