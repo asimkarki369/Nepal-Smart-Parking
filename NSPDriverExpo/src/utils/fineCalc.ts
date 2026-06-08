@@ -13,8 +13,10 @@ export const FINE_BRACKETS: FineBracket[] = [
   { label: 'Standard Fine',  overtimeLabel: '30–60 min',  amount: 250 },
   { label: 'Heavy Fine',     overtimeLabel: '1–2 hours',  amount: 500 },
   { label: 'Severe Fine',    overtimeLabel: '2–4 hours',  amount: 1000 },
-  { label: 'Maximum Fine',   overtimeLabel: '4h+',        amount: 2000 },
+  { label: 'Maximum Fine',   overtimeLabel: '4h+',        amount: 3500 },
 ];
+
+const MAX_FINE = 3500;
 
 export function calcFine(overtimeMins: number): number {
   if (overtimeMins <= 0)   return 0;
@@ -23,9 +25,9 @@ export function calcFine(overtimeMins: number): number {
   if (overtimeMins <= 60)  return 250;
   if (overtimeMins <= 120) return 500;
   if (overtimeMins <= 240) return 1000;
-  // >4h: Rs 2000 + Rs 200 per additional hour
+  // >4h: Rs 2000 + Rs 200 per additional hour, capped at Rs 3500
   const extraHours = Math.ceil((overtimeMins - 240) / 60);
-  return 2000 + extraHours * 200;
+  return Math.min(2000 + extraHours * 200, MAX_FINE);
 }
 
 export function getBracketLabel(overtimeMins: number): FineBracket {
