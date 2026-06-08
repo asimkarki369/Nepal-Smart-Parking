@@ -110,7 +110,7 @@ export default function OfficerScanScreen() {
   const handleIssueFine = () => {
     if (!result) return;
     navigation.navigate('SessionVerify', {
-      sessionToken: result.plateNumberNumber,
+      sessionToken: result.plateNumber,
       overtimeMins: result.overtimeMins,
       fineAmount:   result.fineAmount,
     });
