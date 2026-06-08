@@ -1,13 +1,14 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  StatusBar, Alert,
+  StatusBar, Alert, Image, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 
 import { Colors, Spacing, BorderRadius } from '@/utils/theme';
 import { useStore, primaryVehicle, userPlate, userVehicleType } from '@/store/useStore';
@@ -51,7 +52,17 @@ function MenuItem({
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NavProp>();
-  const { user, logout, activeSession, walletBalance } = useStore();
+  const { user, logout, activeSession, walletBalance, setProfilePicture } = useStore();
+  const [pickerLoading, setPickerLoading] = React.useState(false);
+
+  // Restore profile picture from AsyncStorage on first mount
+  React.useEffect(() => {
+    if (user && !user.profilePicture) {
+      AsyncStorage.getItem('nsp_profile_pic').then(uri => {
+        if (uri) setProfilePicture(uri);
+      });
+    }
+  }, []);
 
   if (!user) return null;
 
@@ -59,6 +70,77 @@ export default function ProfileScreen() {
   const plate     = userPlate(user);
   const vType     = userVehicleType(user);
   const totalVehicles = user.vehicles.length;
+  const initials  = user.fullName.trim().split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+
+  const handlePickPhoto = () => {
+    Alert.alert(
+      'Profile Photo',
+      'Choose how to set your profile picture',
+      [
+        {
+          text: 'Take Photo',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission needed', 'Camera permission is required to take a photo.');
+              return;
+            }
+            setPickerLoading(true);
+            try {
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.7,
+              });
+              if (!result.canceled && result.assets[0]) {
+                const uri = result.assets[0].uri;
+                setProfilePicture(uri);
+                await AsyncStorage.setItem('nsp_profile_pic', uri);
+              }
+            } finally {
+              setPickerLoading(false);
+            }
+          },
+        },
+        {
+          text: 'Choose from Gallery',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission needed', 'Gallery permission is required to choose a photo.');
+              return;
+            }
+            setPickerLoading(true);
+            try {
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.7,
+              });
+              if (!result.canceled && result.assets[0]) {
+                const uri = result.assets[0].uri;
+                setProfilePicture(uri);
+                await AsyncStorage.setItem('nsp_profile_pic', uri);
+              }
+            } finally {
+              setPickerLoading(false);
+            }
+          },
+        },
+        ...(user.profilePicture ? [{
+          text: 'Remove Photo',
+          style: 'destructive' as const,
+          onPress: async () => {
+            setProfilePicture(null);
+            await AsyncStorage.removeItem('nsp_profile_pic');
+          },
+        }] : []),
+        { text: 'Cancel', style: 'cancel' as const },
+      ],
+    );
+  };
 
   const handleLogout = () => {
     if (activeSession) {
@@ -99,11 +181,25 @@ export default function ProfileScreen() {
 
         {/* ── Avatar + name card ── */}
         <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {user.fullName.trim().split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
-            </Text>
-          </View>
+          <TouchableOpacity onPress={handlePickPhoto} activeOpacity={0.85} style={styles.avatarWrap}>
+            {user.profilePicture ? (
+              <Image source={{ uri: user.profilePicture }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatar}>
+                {pickerLoading
+                  ? <ActivityIndicator color={Colors.white} />
+                  : <Text style={styles.avatarText}>{initials}</Text>
+                }
+              </View>
+            )}
+            {/* camera badge */}
+            <View style={styles.cameraBadge}>
+              {pickerLoading
+                ? <ActivityIndicator size={10} color={Colors.white} />
+                : <Icon name="camera" size={12} color={Colors.white} />
+              }
+            </View>
+          </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={styles.userName}>{user.fullName}</Text>
             <View style={styles.idRow}>
@@ -237,12 +333,27 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
+  avatarWrap: {
+    width: 64, height: 64, borderRadius: 32,
+    position: 'relative',
+  },
   avatar: {
-    width: 60, height: 60, borderRadius: 30,
+    width: 64, height: 64, borderRadius: 32,
     backgroundColor: Colors.primary,
     alignItems: 'center', justifyContent: 'center',
   },
+  avatarImage: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: Colors.border,
+  },
   avatarText: { fontSize: 22, fontWeight: '800', color: Colors.white },
+  cameraBadge: {
+    position: 'absolute', bottom: 0, right: 0,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: Colors.primary,
+    borderWidth: 2, borderColor: Colors.white,
+    alignItems: 'center', justifyContent: 'center',
+  },
   userName: { fontSize: 17, fontWeight: '700', color: Colors.text, marginBottom: 4 },
   idRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   idText: { fontSize: 12, color: Colors.muted },

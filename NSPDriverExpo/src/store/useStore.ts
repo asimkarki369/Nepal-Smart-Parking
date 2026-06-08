@@ -23,6 +23,7 @@ export interface User {
   phone?: string;           // optional — for notifications only
   vehicles: Vehicle[];      // multiple vehicles per account
   walletBalance: number;
+  profilePicture?: string;  // local file URI set by the user
 }
 
 // ── Helpers — pull primary vehicle info from user ─────────────────────────────
@@ -114,6 +115,7 @@ interface NSPStore {
   walletBalance:  number;
 
   setUser:           (user: User) => void;
+  setProfilePicture: (uri: string | null) => void;
   logout:            () => void;
   setActiveSession:  (session: ActiveSession | null) => void;
   extendSession:     (additionalMinutes: number) => void;
@@ -143,6 +145,11 @@ export const useStore = create<NSPStore>((set, get) => ({
   walletBalance:   0,
 
   setUser: (user) => set({ user, isAuthenticated: true, walletBalance: user.walletBalance }),
+
+  setProfilePicture: (uri) =>
+    set((state) => ({
+      user: state.user ? { ...state.user, profilePicture: uri ?? undefined } : null,
+    })),
 
   logout: () => {
     const s = get().activeSession;
