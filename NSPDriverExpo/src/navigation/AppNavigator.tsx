@@ -19,8 +19,10 @@ import PaymentConfirmScreen from '@/screens/main/PaymentConfirmScreen';
 import SessionScreen       from '@/screens/main/SessionScreen';
 import HistoryScreen       from '@/screens/main/HistoryScreen';
 import WalletScreen        from '@/screens/main/WalletScreen';
-import VehiclesScreen      from '@/screens/main/VehiclesScreen';
-import ProfileScreen       from '@/screens/main/ProfileScreen';
+import VehiclesScreen       from '@/screens/main/VehiclesScreen';
+import ProfileScreen        from '@/screens/main/ProfileScreen';
+import PrivacyPolicyScreen  from '@/screens/main/PrivacyPolicyScreen';
+import HelpFAQScreen        from '@/screens/main/HelpFAQScreen';
 
 // Officer screens
 import OfficerLoginScreen    from '@/screens/officer/OfficerLoginScreen';
@@ -174,6 +176,8 @@ export default function AppNavigator() {
             <Stack.Screen name="ZoneDetail"     component={ZoneDetailScreen} />
             <Stack.Screen name="PaymentConfirm" component={PaymentConfirmScreen} />
             <Stack.Screen name="Vehicles"       component={VehiclesScreen} />
+            <Stack.Screen name="PrivacyPolicy"  component={PrivacyPolicyScreen} />
+            <Stack.Screen name="HelpFAQ"        component={HelpFAQScreen} />
           </>
         )}
 

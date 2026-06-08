@@ -188,11 +188,13 @@ export default function ProfileScreen() {
             icon="shield-check-outline"
             label="Privacy Policy"
             sublabel="How we use your data"
+            onPress={() => navigation.navigate('PrivacyPolicy')}
           />
           <View style={styles.menuDivider} />
           <MenuItem
             icon="help-circle-outline"
             label="Help & FAQ"
+            onPress={() => navigation.navigate('HelpFAQ')}
           />
           <View style={styles.menuDivider} />
           <MenuItem

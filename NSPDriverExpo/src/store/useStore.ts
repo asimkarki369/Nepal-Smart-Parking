@@ -44,6 +44,7 @@ export interface ActiveSession {
   startTime: Date;
   endTimeCap: Date | null;
   vehicleType: VehicleType;
+  plateNumber: string;      // plate of the vehicle actually being parked
   hourlyRate: number;
   paymentMethod: string;
   qrToken: string;
@@ -144,13 +145,10 @@ export const useStore = create<NSPStore>((set, get) => ({
   setUser: (user) => set({ user, isAuthenticated: true, walletBalance: user.walletBalance }),
 
   logout: () => {
-    // Also unregister session from registry
     const s = get().activeSession;
-    const u = get().user;
-    if (s && u) {
-      const plate = primaryVehicle(u)?.plateNumber ?? '';
+    if (s) {
       const reg = { ...get().sessionRegistry };
-      delete reg[plate.toUpperCase()];
+      delete reg[s.plateNumber.toUpperCase()];
       set({ sessionRegistry: reg });
     }
     set({ user: null, isAuthenticated: false, activeSession: null });
@@ -158,12 +156,12 @@ export const useStore = create<NSPStore>((set, get) => ({
 
   setActiveSession: (session) => {
     const user = get().user;
-    const pv   = user ? primaryVehicle(user) : undefined;
-    if (session && user && pv) {
-      // Register in shared registry so officer can see it
+    if (session && user) {
+      // Use the plate stored on the session (the vehicle actually being parked)
+      const plate = session.plateNumber;
       const entry: RegistryEntry = {
         sessionId:    session.sessionId,
-        plateNumber:  pv.plateNumber,
+        plateNumber:  plate,
         driverName:   user.fullName,
         nationalId:   user.nationalId,
         phone:        user.phone ?? '',
@@ -177,14 +175,14 @@ export const useStore = create<NSPStore>((set, get) => ({
         qrToken:      session.qrToken,
       };
       const reg = { ...get().sessionRegistry };
-      reg[pv.plateNumber.toUpperCase()] = entry;
+      reg[plate.toUpperCase()] = entry;
       set({ activeSession: session, sessionRegistry: reg });
     } else {
-      // Session ended — remove from registry
-      if (user) {
-        const plate = primaryVehicle(user)?.plateNumber ?? '';
+      // Session ended — remove from registry using the session's own plate
+      const prev = get().activeSession;
+      if (prev) {
         const reg = { ...get().sessionRegistry };
-        delete reg[plate.toUpperCase()];
+        delete reg[prev.plateNumber.toUpperCase()];
         set({ activeSession: null, sessionRegistry: reg });
       } else {
         set({ activeSession: null });
@@ -200,17 +198,13 @@ export const useStore = create<NSPStore>((set, get) => ({
       ? new Date(sess.endTimeCap.getTime() + additionalMinutes * 60000)
       : null;
     const updated = { ...sess, endTimeCap: cap, expiresAt: cap ?? sess.expiresAt, durationMinutes: sess.durationMinutes + additionalMinutes };
-    // Also update registry
-    if (user) {
-      const plate = primaryVehicle(user)?.plateNumber ?? '';
-      const reg = { ...get().sessionRegistry };
-      if (reg[plate.toUpperCase()]) {
-        reg[plate.toUpperCase()] = { ...reg[plate.toUpperCase()], endTimeCap: cap };
-      }
-      set({ activeSession: updated, sessionRegistry: reg });
-    } else {
-      set({ activeSession: updated });
+    // Also update registry using the session's own plate
+    const plate = sess.plateNumber.toUpperCase();
+    const reg = { ...get().sessionRegistry };
+    if (reg[plate]) {
+      reg[plate] = { ...reg[plate], endTimeCap: cap };
     }
+    set({ activeSession: updated, sessionRegistry: reg });
   },
 
   setSessionHistory: (history) => set({ sessionHistory: history }),

@@ -117,7 +117,7 @@ export interface Zone {
   type: ZoneType;
   rate2w: number;    // Bike / Scooter            — Rs 25/hr
   rate4w: number;    // Car / Jeep petrol/diesel  — Rs 50/hr
-  rateEv: number;    // Electric vehicle          — Rs 35/hr
+  rateEv: number;    // Electric vehicle          — Rs 15/hr
   rateBus: number;   // Bus / Minivan / Minibus   — Rs 75/hr
   totalSpots: number;
   availableSpots: number;
@@ -134,7 +134,7 @@ export const mockZones: Zone[] = [
     code: 'Z-KMC-01', name: 'New Road', city: 'Kathmandu',
     type: 'standard',
     latitude: 27.7048, longitude: 85.3132,
-    rate2w: 25, rate4w: 50, rateEv: 35, rateBus: 75,
+    rate2w: 25, rate4w: 50, rateEv: 15, rateBus: 75,
     totalSpots: 50, availableSpots: 8,
     occupancyPercent: 84,
   },
@@ -142,7 +142,7 @@ export const mockZones: Zone[] = [
     code: 'Z-KMC-02', name: 'Putalisadak', city: 'Kathmandu',
     type: 'standard',
     latitude: 27.7014, longitude: 85.3199,
-    rate2w: 25, rate4w: 50, rateEv: 35, rateBus: 75,
+    rate2w: 25, rate4w: 50, rateEv: 15, rateBus: 75,
     totalSpots: 40, availableSpots: 0,
     occupancyPercent: 100,
   },
@@ -150,7 +150,7 @@ export const mockZones: Zone[] = [
     code: 'Z-KMC-04', name: 'Durbar Marg', city: 'Kathmandu',
     type: 'standard',
     latitude: 27.7120, longitude: 85.3145,
-    rate2w: 25, rate4w: 50, rateEv: 35, rateBus: 75,
+    rate2w: 25, rate4w: 50, rateEv: 15, rateBus: 75,
     totalSpots: 60, availableSpots: 3,
     occupancyPercent: 95,
   },
@@ -158,7 +158,7 @@ export const mockZones: Zone[] = [
     code: 'Z-PMC-01', name: 'New Road', city: 'Pokhara',
     type: 'standard',
     latitude: 28.2096, longitude: 83.9856,
-    rate2w: 25, rate4w: 50, rateEv: 35, rateBus: 75,
+    rate2w: 25, rate4w: 50, rateEv: 15, rateBus: 75,
     totalSpots: 35, availableSpots: 12,
     occupancyPercent: 66,
   },
@@ -186,7 +186,7 @@ export const mockZones: Zone[] = [
     code: 'Z-PRV-01', name: 'Civil Mall Parking', city: 'Kathmandu',
     type: 'private',
     latitude: 27.7034, longitude: 85.3164,
-    rate2w: 25, rate4w: 50, rateEv: 35, rateBus: 75,
+    rate2w: 25, rate4w: 50, rateEv: 15, rateBus: 75,
     totalSpots: 120, availableSpots: 45,
     occupancyPercent: 63,
     privateOperator: 'Civil Mall Pvt. Ltd.',
@@ -195,7 +195,7 @@ export const mockZones: Zone[] = [
     code: 'Z-PRV-02', name: 'Labim Mall Parking', city: 'Kathmandu',
     type: 'private',
     latitude: 27.6878, longitude: 85.3176,
-    rate2w: 25, rate4w: 50, rateEv: 35, rateBus: 75,
+    rate2w: 25, rate4w: 50, rateEv: 15, rateBus: 75,
     totalSpots: 80, availableSpots: 22,
     occupancyPercent: 73,
     privateOperator: 'Labim Mall Pvt. Ltd.',
@@ -205,7 +205,7 @@ export const mockZones: Zone[] = [
     code: 'Z-EV-01', name: 'Bagmati EV Hub', city: 'Kathmandu',
     type: 'electric',
     latitude: 27.6974, longitude: 85.3240,
-    rate2w: 25, rate4w: 50, rateEv: 35, rateBus: 75,
+    rate2w: 25, rate4w: 50, rateEv: 15, rateBus: 75,
     totalSpots: 12, availableSpots: 5,
     occupancyPercent: 58,
     evChargerCount: 12,
@@ -214,7 +214,7 @@ export const mockZones: Zone[] = [
     code: 'Z-EV-02', name: 'Patan EV Station', city: 'Lalitpur',
     type: 'electric',
     latitude: 27.6693, longitude: 85.3240,
-    rate2w: 25, rate4w: 50, rateEv: 35, rateBus: 75,
+    rate2w: 25, rate4w: 50, rateEv: 15, rateBus: 75,
     totalSpots: 8, availableSpots: 3,
     occupancyPercent: 63,
     evChargerCount: 8,

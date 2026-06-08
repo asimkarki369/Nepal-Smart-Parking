@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors, Spacing, BorderRadius } from '@/utils/theme';
 import { sessionsAPI, mockZones } from '@/services/api';
-import { useStore, primaryVehicle } from '@/store/useStore';
+import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 
 type NavProp       = NativeStackNavigationProp<RootStackParamList, 'PaymentConfirm'>;
@@ -49,9 +49,9 @@ export default function PaymentConfirmScreen() {
   const route      = useRoute<ConfirmRoute>();
   const insets     = useSafeAreaInsets();
 
-  const { zoneCode, vehicleType, durationMinutes, hourlyRate: routeRate } = route.params;
+  const { zoneCode, vehicleType, durationMinutes, hourlyRate: routeRate, plateNumber } = route.params;
   const { user, setActiveSession } = useStore();
-  const plate = user ? (primaryVehicle(user)?.plateNumber ?? '—') : '—';
+  const plate = plateNumber || '—';
 
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethodId>('esewa');
   const [loading,        setLoading]        = useState(false);
@@ -84,7 +84,7 @@ export default function PaymentConfirmScreen() {
         zoneLocation: `${zone?.city ?? ''}, Nepal`,
         startTime, endTimeCap: expiresAt, expiresAt,
         durationMinutes, fee: parkingFee, serviceFee, totalPaid: total,
-        vehicleType, hourlyRate,
+        vehicleType, plateNumber: plate, hourlyRate,
         paymentMethod: selectedMethod,
         qrToken: session.qrToken,
       });
@@ -104,7 +104,7 @@ export default function PaymentConfirmScreen() {
         zoneLocation: `${zone?.city ?? ''}, Nepal`,
         startTime: now, endTimeCap: expiresAt, expiresAt,
         durationMinutes, fee: parkingFee, serviceFee, totalPaid: total,
-        vehicleType, hourlyRate,
+        vehicleType, plateNumber: plate, hourlyRate,
         paymentMethod: selectedMethod,
         qrToken,
       });

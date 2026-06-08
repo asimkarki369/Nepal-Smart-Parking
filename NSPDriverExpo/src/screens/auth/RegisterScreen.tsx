@@ -19,7 +19,7 @@ type NavProp = NativeStackNavigationProp<RootStackParamList, 'Register'>;
 const VEHICLE_TYPES: { value: VehicleType; label: string; icon: string; rate: number }[] = [
   { value: '2w',  label: 'Bike / Scooter',   icon: 'motorbike',      rate: 25 },
   { value: '4w',  label: 'Car / Jeep',       icon: 'car',            rate: 50 },
-  { value: 'ev',  label: 'Electric Vehicle', icon: 'lightning-bolt', rate: 35 },
+  { value: 'ev',  label: 'Electric Vehicle', icon: 'lightning-bolt', rate: 15 },
   { value: 'bus', label: 'Bus / Minibus',    icon: 'bus',            rate: 75 },
 ];
 

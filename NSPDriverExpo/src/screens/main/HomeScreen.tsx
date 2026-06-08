@@ -14,10 +14,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import * as Notifications from 'expo-notifications';
 import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
+import { readAsStringAsync, deleteAsync, EncodingType } from 'expo-file-system/legacy';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import { Colors, Spacing, BorderRadius } from '@/utils/theme';
 import { mockZones, sessionsAPI, Zone, ZoneType } from '@/services/api';
-import { useStore, primaryVehicle } from '@/store/useStore';
+import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Main'>;
@@ -533,9 +534,8 @@ export default function HomeScreen() {
     setStopping(true);
 
     // Capture actual cost at the moment of stopping (may be less than booked if early checkout)
-    const endTime  = new Date();
-    const actual   = calcCost(activeSession.startTime, endTime, activeSession.hourlyRate);
-    const pv       = user ? primaryVehicle(user) : undefined;
+    const endTime = new Date();
+    const actual  = calcCost(activeSession.startTime, endTime, activeSession.hourlyRate);
 
     try { await sessionsAPI.stop(activeSession.sessionId); } catch { }
 
@@ -556,7 +556,7 @@ export default function HomeScreen() {
       bookedTotal:   activeSession.totalPaid,
       paymentMethod: activeSession.paymentMethod,
       vehicleType:   activeSession.vehicleType,
-      plate:         pv?.plateNumber ?? '—',
+      plate:         activeSession.plateNumber,   // ← correct plate, not always primary
     });
 
     setActiveSession(null);
@@ -808,6 +808,7 @@ export default function HomeScreen() {
             data={filteredZones}
             keyExtractor={z => z.code}
             keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: insets.bottom + Spacing.md }}
             ListHeaderComponent={
               <>
                 {/* Recent searches */}
@@ -912,24 +913,34 @@ export default function HomeScreen() {
 
           const downloadPDF = async () => {
             try {
-              const html    = buildReceiptHTML(finalReceipt, pmLabel, vLabel);
-              const { uri } = await Print.printToFileAsync({
-                html,
-                base64: false,
+              // 1. Render HTML → temp PDF file
+              const html = buildReceiptHTML(finalReceipt, pmLabel, vLabel);
+              const { uri: tempUri } = await Print.printToFileAsync({ html, base64: false });
+
+              // 2. Read temp PDF as Base64
+              const base64Data = await readAsStringAsync(tempUri, {
+                encoding: EncodingType.Base64,
               });
-              // Rename to a friendly filename by copying (expo-print uses a temp path)
-              const canShare = await Sharing.isAvailableAsync();
-              if (canShare) {
-                await Sharing.shareAsync(uri, {
-                  mimeType:    'application/pdf',
-                  dialogTitle: 'NSP Parking Receipt',
-                  UTI:         'com.adobe.pdf',
-                });
-              } else {
-                Alert.alert('Saved', `Receipt saved to: ${uri}`);
-              }
-            } catch (err) {
-              Alert.alert('Error', 'Could not generate PDF. Please try again.');
+              await deleteAsync(tempUri, { idempotent: true });
+
+              // 3. Write directly to device Downloads folder (no share sheet)
+              const ts       = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+              const fileName = `NSP_Receipt_${ts}.pdf`;
+              const destPath = `${ReactNativeBlobUtil.fs.dirs.DownloadDir}/${fileName}`;
+              await ReactNativeBlobUtil.fs.writeFile(destPath, base64Data, 'base64');
+
+              // 4. Notify Android media scanner so it appears immediately in Files app
+              await ReactNativeBlobUtil.android.addCompleteDownload({
+                title:        fileName,
+                description:  'NSP Parking Receipt',
+                mime:         'application/pdf',
+                path:         destPath,
+                showNotification: true,
+              });
+
+              Alert.alert('✓ Downloaded', `Receipt saved to Downloads:\n${fileName}`);
+            } catch (err: any) {
+              Alert.alert('Error', err?.message ?? String(err));
             }
           };
 

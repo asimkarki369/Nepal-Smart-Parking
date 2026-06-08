@@ -7,8 +7,10 @@ export type RootStackParamList = {
   // Driver main
   Main: undefined;
   ZoneDetail: { zoneCode: string };
-  PaymentConfirm: { zoneCode: string; vehicleType: '2w' | '4w'; durationMinutes: number; hourlyRate: number };
+  PaymentConfirm: { zoneCode: string; vehicleType: '2w' | '4w'; durationMinutes: number; hourlyRate: number; plateNumber: string };
   Vehicles: undefined;
+  PrivacyPolicy: undefined;
+  HelpFAQ: undefined;
   // Officer auth
   OfficerLogin: undefined;
   // Officer main

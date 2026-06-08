@@ -22,7 +22,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Colors, Spacing, BorderRadius } from '@/utils/theme';
 import { mockZones, Zone } from '@/services/api';
-import { useStore, userVehicleType } from '@/store/useStore';
+import { useStore, userVehicleType, primaryVehicle } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
 import ClockTimePicker from '@/components/ClockTimePicker';
 
@@ -85,11 +85,29 @@ export default function ZoneDetailScreen() {
 
   const zone    = mockZones.find(z => z.code === route.params.zoneCode) ?? mockZones[0];
   const isFree  = zone.type === 'free';
+  const isEvZone = zone.type === 'electric';
   const maxMins = isFree ? (zone.freeTimeLimitMins ?? undefined) : undefined;
   const isFull  = zone.occupancyPercent >= 95;
 
-  // Default vehicle type from user's primary vehicle
-  const defaultVType = userVehicleType(user) as VType;
+  // Which vehicle types the user actually has plates registered for
+  const userHasType = (vt: VType): boolean =>
+    !!(user?.vehicles.some(v => v.vehicleType === vt));
+
+  // A vehicle type chip is allowed to be selected when:
+  //  • user has a plate of that type registered, AND
+  //  • if this is an EV zone, only 'ev' is allowed
+  const chipAllowed = (vt: VType): boolean => {
+    if (isEvZone && vt !== 'ev') return false;   // EV zone: non-EV blocked
+    return userHasType(vt);                       // must own that vehicle type
+  };
+
+  // Default to the primary vehicle's type, but if it's blocked (e.g. car in EV zone) fall back to ev
+  const defaultVType = ((): VType => {
+    const pv = userVehicleType(user) as VType;
+    if (chipAllowed(pv)) return pv;
+    if (isEvZone && userHasType('ev')) return 'ev';
+    return pv;  // keep as-is; canContinue will block
+  })();
 
   const [vehicleType,  setVehicleType]  = useState<VType>(defaultVType);
   const [selectedMins, setSelectedMins] = useState<number | null>(null);
@@ -102,7 +120,7 @@ export default function ZoneDetailScreen() {
   const svcFee     = Math.round(parkingFee * 0.10);
   const totalFee   = parkingFee + svcFee;
 
-  const canContinue = !isFull && selectedMins != null;
+  const canContinue = !isFull && selectedMins != null && chipAllowed(vehicleType);
 
   // Zone short code: "Z-KMC-01" → "KMC-01"
   const zoneShort = zone.code.replace(/^Z-/, '');
@@ -151,27 +169,73 @@ export default function ZoneDetailScreen() {
         {/* ── Vehicle type selector ── */}
         <View style={styles.vehicleSection}>
           <Text style={styles.sectionLabel}>Vehicle type</Text>
+
+          {/* EV-zone restriction banner */}
+          {isEvZone && (
+            <View style={styles.evZoneBanner}>
+              <Icon name="lightning-bolt" size={14} color={Colors.green} />
+              <Text style={styles.evZoneBannerText}>
+                EV charging zone — only registered electric vehicles may park here
+              </Text>
+            </View>
+          )}
+
           <View style={styles.vehicleGrid}>
             {VEHICLE_OPTIONS.map(opt => {
-              const r       = zoneRate(zone, opt.value);
-              const active  = vehicleType === opt.value;
+              const r        = zoneRate(zone, opt.value);
+              const allowed  = chipAllowed(opt.value);
+              const active   = vehicleType === opt.value && allowed;
+              const locked   = !allowed;
+
+              // Reason for lock (shown as sub-label)
+              const lockReason = isEvZone && opt.value !== 'ev'
+                ? 'EV zone only'
+                : !userHasType(opt.value)
+                  ? 'Not registered'
+                  : '';
+
               return (
                 <TouchableOpacity
                   key={opt.value}
-                  style={[styles.vehicleChip, active && styles.vehicleChipActive]}
-                  onPress={() => setVehicleType(opt.value)}
-                  activeOpacity={0.75}
+                  style={[
+                    styles.vehicleChip,
+                    active  && styles.vehicleChipActive,
+                    locked  && styles.vehicleChipLocked,
+                  ]}
+                  onPress={() => {
+                    if (locked) {
+                      const msg = isEvZone && opt.value !== 'ev'
+                        ? 'This is an EV-only zone. Only electric vehicles may park here.'
+                        : `You don't have a registered ${opt.label} plate. Go to My Vehicles to add one.`;
+                      Alert.alert('Not Allowed', msg);
+                      return;
+                    }
+                    setVehicleType(opt.value);
+                  }}
+                  activeOpacity={locked ? 1 : 0.75}
                 >
+                  {locked && (
+                    <Icon name="lock" size={12} color={Colors.muted}
+                      style={{ position: 'absolute', top: 6, right: 6 }} />
+                  )}
                   <Icon
                     name={opt.icon as any}
                     size={20}
-                    color={active ? Colors.white : Colors.muted}
+                    color={active ? Colors.white : locked ? Colors.border : Colors.muted}
                   />
-                  <Text style={[styles.vehicleChipLabel, active && styles.vehicleChipLabelActive]}>
+                  <Text style={[
+                    styles.vehicleChipLabel,
+                    active && styles.vehicleChipLabelActive,
+                    locked && styles.vehicleChipLabelLocked,
+                  ]}>
                     {opt.label}
                   </Text>
-                  <Text style={[styles.vehicleChipRate, active && styles.vehicleChipRateActive]}>
-                    {isFree ? 'Free' : `Rs ${r}/hr`}
+                  <Text style={[
+                    styles.vehicleChipRate,
+                    active && styles.vehicleChipRateActive,
+                    locked && styles.vehicleChipRateLocked,
+                  ]}>
+                    {locked ? lockReason : isFree ? 'Free' : `Rs ${r}/hr`}
                   </Text>
                 </TouchableOpacity>
               );
@@ -265,6 +329,12 @@ export default function ZoneDetailScreen() {
               vehicleType:     vehicleType === 'ev' || vehicleType === 'bus' ? '4w' : vehicleType,
               durationMinutes: selectedMins!,
               hourlyRate:      rate,   // preserve EV/bus-specific rate
+              // Find the plate matching the selected vehicle type; fall back to primary
+              plateNumber: (
+                user?.vehicles.find(v => v.vehicleType === vehicleType)
+                ?? user?.vehicles.find(v => (vehicleType === 'ev' || vehicleType === 'bus') ? v.vehicleType === '4w' : v.vehicleType === vehicleType)
+                ?? primaryVehicle(user ?? { vehicles: [] } as any)
+              )?.plateNumber ?? '—',
             })
           }
           activeOpacity={0.85}
@@ -329,14 +399,30 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     borderColor:     Colors.primary,
   },
+  vehicleChipLocked: {
+    backgroundColor: Colors.light,
+    borderColor:     Colors.border,
+    opacity: 0.6,
+  },
   vehicleChipLabel: {
     fontSize: 11, fontWeight: '700', color: Colors.muted,
   },
   vehicleChipLabelActive: { color: Colors.white },
+  vehicleChipLabelLocked: { color: Colors.border },
   vehicleChipRate: {
     fontSize: 10, color: Colors.muted,
   },
   vehicleChipRateActive: { color: 'rgba(255,255,255,0.75)' },
+  vehicleChipRateLocked: { color: Colors.border, fontSize: 9 },
+
+  // EV zone banner
+  evZoneBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    backgroundColor: Colors.greenLight, borderRadius: BorderRadius.sm,
+    paddingHorizontal: 10, paddingVertical: 8, marginBottom: Spacing.sm,
+    borderWidth: 1, borderColor: Colors.green,
+  },
+  evZoneBannerText: { fontSize: 12, color: Colors.green, fontWeight: '600', flex: 1 },
 
   // ── Duration block ──
   durationBlock: {
