@@ -49,7 +49,14 @@
           "googleMapsApiKey": "AIzaSyDTaGLkW5rwpvKOvby9AqLZGTnlwY-jyWk"
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Nepal Smart Parking needs access to your photos to set a profile picture.",
+          "cameraPermission": "Nepal Smart Parking needs camera access to take a profile photo."
+        }
+      ]
     ]
   }
 }

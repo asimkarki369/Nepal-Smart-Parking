@@ -56,13 +56,12 @@ export default function ProfileScreen() {
   const [pickerLoading, setPickerLoading] = React.useState(false);
 
   // Restore profile picture from AsyncStorage on first mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => {
-    if (user && !user.profilePicture) {
-      AsyncStorage.getItem('nsp_profile_pic').then(uri => {
-        if (uri) setProfilePicture(uri);
-      });
-    }
-  }, []);
+    AsyncStorage.getItem('nsp_profile_pic').then(uri => {
+      if (uri) setProfilePicture(uri);
+    });
+  }, []); // intentionally runs once on mount only
 
   if (!user) return null;
 
