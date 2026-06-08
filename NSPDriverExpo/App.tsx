@@ -1,8 +1,24 @@
 import 'react-native-gesture-handler';
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, LogBox } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from '@/navigation/AppNavigator';
+
+// Suppress known benign warnings from third-party native packages
+LogBox.ignoreLogs([
+  // react-native-maps / expo-notifications NativeEventEmitter boilerplate
+  'new NativeEventEmitter',
+  // reanimated strict-mode worklet warning during fast refresh
+  "[Reanimated]",
+  // react-native-maps Google Maps init message
+  'GoogleMaps',
+  // expo-notifications on Android without a physical device
+  'expo-notifications',
+  // Non-serializable navigation state (dates in params)
+  'Non-serializable values were found in the navigation state',
+  // Require cycle from expo internals
+  'Require cycle:',
+]);
 
 // ── Error boundary — catches render crashes and shows a message ───────────────
 class ErrorBoundary extends React.Component<
