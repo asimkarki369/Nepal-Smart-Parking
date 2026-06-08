@@ -54,7 +54,7 @@ const SECTIONS: Section[] = [
     icon: 'account-edit-outline',
     title: 'Your Rights',
     body:
-      'Under Nepal's privacy guidelines you have the right to:\n• Access the personal data we hold about you\n• Correct inaccurate information\n• Request deletion of your data\n• Withdraw consent for optional data processing\n\nContact us at helpdesk@nepalsmsartparking.com to exercise any of these rights.',
+      "Under Nepal's privacy guidelines you have the right to:\n• Access the personal data we hold about you\n• Correct inaccurate information\n• Request deletion of your data\n• Withdraw consent for optional data processing\n\nContact us at helpdesk@nepalsmsartparking.com to exercise any of these rights.",
   },
   {
     icon: 'refresh',
