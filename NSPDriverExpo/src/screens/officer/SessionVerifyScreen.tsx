@@ -121,7 +121,7 @@ export default function SessionVerifyScreen() {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <View style={[styles.header, { backgroundColor: Colors.green }]}>
-          <TouchableOpacity onPress={() => { navigation.goBack(); navigation.goBack(); }} style={styles.backBtn}>
+          <TouchableOpacity onPress={() => { navigation.navigate('OfficerMain'); }} style={styles.backBtn}>
             <Icon name="arrow-left" size={22} color={Colors.white} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Fine Issued</Text>
@@ -149,7 +149,7 @@ export default function SessionVerifyScreen() {
           </Text>
 
           <TouchableOpacity style={styles.doneBtn}
-            onPress={() => { navigation.goBack(); navigation.goBack(); }}>
+            onPress={() => { navigation.navigate('OfficerMain'); }}>
             <Text style={styles.doneBtnText}>Back to Dashboard</Text>
           </TouchableOpacity>
         </View>
