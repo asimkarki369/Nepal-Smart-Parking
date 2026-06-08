@@ -28,15 +28,23 @@ function vehicleLabel(vt: string) {
 }
 
 interface PhotoEvidence {
-  vehicle:   string | null;
-  plate:     string | null;
-  timeCard:  string | null;
+  vehicleFront: string | null;
+  vehicleBack:  string | null;
+  vehicleRight: string | null;
+  vehicleLeft:  string | null;
+  plateFront:   string | null;
+  plateBack:    string | null;
+  timeCard:     string | null;
 }
 
-const PHOTO_SLOTS = [
-  { key: 'vehicle'  as const, label: 'Vehicle Photo',       icon: 'car-outline',         hint: 'Full vehicle from front/side' },
-  { key: 'plate'    as const, label: 'Number Plate',         icon: 'card-text-outline',   hint: 'Clear close-up of plate' },
-  { key: 'timeCard' as const, label: 'Time Card / Meter',    icon: 'clock-outline',        hint: 'Physical time card showing start time' },
+const PHOTO_SLOTS: { key: keyof PhotoEvidence; label: string; icon: string; hint: string }[] = [
+  { key: 'vehicleFront', label: 'Vehicle — Front',     icon: 'car',                 hint: 'Full front view of the vehicle'       },
+  { key: 'vehicleBack',  label: 'Vehicle — Back',      icon: 'car-back',            hint: 'Full rear view of the vehicle'        },
+  { key: 'vehicleRight', label: 'Vehicle — Right Side',icon: 'car-side',            hint: 'Right side of the vehicle'            },
+  { key: 'vehicleLeft',  label: 'Vehicle — Left Side', icon: 'car-side',            hint: 'Left side of the vehicle'             },
+  { key: 'plateFront',   label: 'Number Plate — Front',icon: 'card-text-outline',   hint: 'Close-up of front number plate'       },
+  { key: 'plateBack',    label: 'Number Plate — Back', icon: 'card-text',           hint: 'Close-up of rear number plate'        },
+  { key: 'timeCard',     label: 'Time Card / Meter',   icon: 'clock-outline',       hint: 'Parking meter or time card at vehicle'},
 ];
 
 export default function SessionVerifyScreen() {
@@ -52,13 +60,18 @@ export default function SessionVerifyScreen() {
   const session = sessionRegistry[sessionToken.toUpperCase()]
     ?? Object.values(sessionRegistry).find(s => s.sessionId === sessionToken);
 
-  const [photos,   setPhotos]   = useState<PhotoEvidence>({ vehicle: null, plate: null, timeCard: null });
+  const [photos,   setPhotos]   = useState<PhotoEvidence>({
+    vehicleFront: null, vehicleBack: null, vehicleRight: null, vehicleLeft: null,
+    plateFront: null, plateBack: null, timeCard: null,
+  });
   const [issuing,  setIssuing]  = useState(false);
   const [issued,   setIssued]   = useState(false);
   const [step,     setStep]     = useState<'details' | 'evidence' | 'confirm'>('details');
 
   const isViolation   = overtimeMins > 0 || !session;
-  const allPhotos     = photos.vehicle && photos.plate && photos.timeCard;
+  const capturedCount = Object.values(photos).filter(Boolean).length;
+  const totalSlots    = PHOTO_SLOTS.length;
+  const allPhotos     = capturedCount === totalSlots;
   const bracket       = getBracketLabel(overtimeMins);
 
   const takePhoto = async (slot: keyof PhotoEvidence) => {
@@ -85,7 +98,7 @@ export default function SessionVerifyScreen() {
   };
 
   const handleIssueFine = async () => {
-    if (!allPhotos) { Alert.alert('Evidence Required', 'All 3 photos must be captured before issuing a fine.'); return; }
+    if (!allPhotos) { Alert.alert('Evidence Required', `All ${totalSlots} photos must be captured before issuing a fine.`); return; }
     setIssuing(true);
     await new Promise(r => setTimeout(r, 900));
     addFine({
@@ -128,7 +141,7 @@ export default function SessionVerifyScreen() {
             <SummaryRow label="Fine"       value={`Rs ${fineAmount}`} bold />
             <SummaryRow label="Officer"    value={officer?.id ?? ''} />
             <SummaryRow label="Time"       value={fmtTime(new Date())} />
-            <SummaryRow label="Evidence"   value="3 photos captured ✓" />
+            <SummaryRow label="Evidence"   value="7 photos captured ✓" />
           </View>
 
           <Text style={styles.issuedNotice}>
@@ -262,7 +275,7 @@ export default function SessionVerifyScreen() {
             <View style={styles.evidenceNotice}>
               <Icon name="camera-alert" size={20} color="#E65100" />
               <Text style={styles.evidenceNoticeText}>
-                All 3 photos are mandatory before a fine can be issued. This protects officers from disputes.
+                All 7 photos are mandatory before a fine can be issued. This protects officers from disputes.
               </Text>
             </View>
 
@@ -301,11 +314,11 @@ export default function SessionVerifyScreen() {
 
             <View style={styles.photoProgress}>
               <Text style={styles.photoProgressText}>
-                {Object.values(photos).filter(Boolean).length} of 3 photos captured
+                {capturedCount} of {totalSlots} photos captured
               </Text>
               <View style={styles.photoProgressBar}>
                 <View style={[styles.photoProgressFill, {
-                  width: `${(Object.values(photos).filter(Boolean).length / 3) * 100}%` as any,
+                  width: `${(capturedCount / totalSlots) * 100}%` as any,
                 }]} />
               </View>
             </View>
@@ -340,12 +353,12 @@ export default function SessionVerifyScreen() {
 
             {/* Photo thumbnails */}
             <View style={styles.card}>
-              <Text style={styles.cardLabel}>EVIDENCE PHOTOS ({Object.values(photos).filter(Boolean).length}/3)</Text>
-              <View style={styles.thumbRow}>
+              <Text style={styles.cardLabel}>EVIDENCE PHOTOS ({capturedCount}/{totalSlots})</Text>
+              <View style={styles.thumbGrid}>
                 {PHOTO_SLOTS.map(slot => (
                   <View key={slot.key} style={styles.thumbWrap}>
                     <Image source={{ uri: photos[slot.key]! }} style={styles.thumb} />
-                    <Text style={styles.thumbLabel}>{slot.label}</Text>
+                    <Text style={styles.thumbLabel} numberOfLines={2}>{slot.label}</Text>
                   </View>
                 ))}
               </View>
@@ -540,10 +553,10 @@ const styles = StyleSheet.create({
   confirmTotalLabel: { fontSize: 15, fontWeight: '700', color: Colors.text },
   confirmTotalValue: { fontSize: 24, fontWeight: '800', color: '#E65100' },
 
-  thumbRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
-  thumbWrap: { flex: 1, alignItems: 'center', gap: 4 },
+  thumbGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.sm },
+  thumbWrap: { width: '30%', alignItems: 'center', gap: 4 },
   thumb:     { width: '100%', aspectRatio: 1, borderRadius: BorderRadius.md, backgroundColor: Colors.light },
-  thumbLabel:{ fontSize: 9, color: Colors.muted, textAlign: 'center' },
+  thumbLabel:{ fontSize: 9, color: Colors.muted, textAlign: 'center', lineHeight: 13 },
 
   issueBtn: {
     backgroundColor: '#E65100', borderRadius: BorderRadius.lg,
