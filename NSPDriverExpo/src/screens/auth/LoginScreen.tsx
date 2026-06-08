@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   StatusBar, ActivityIndicator, KeyboardAvoidingView,
-  Platform, ScrollView,
+  Platform, ScrollView, Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -13,6 +13,16 @@ import { Colors, Spacing, BorderRadius } from '@/utils/theme';
 import { useStore } from '@/store/useStore';
 import { authAPI } from '@/services/api';
 import { RootStackParamList } from '@/navigation/types';
+import {
+  isBiometricAvailable,
+  isDriverBiometricEnabled,
+  getBiometricLabel,
+  getBiometricIcon,
+  authenticateBiometric,
+  saveDriverBiometric,
+  getDriverBiometricCredentials,
+  clearDriverBiometric,
+} from '@/utils/biometricAuth';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
@@ -20,12 +30,67 @@ export default function LoginScreen() {
   const navigation = useNavigation<NavProp>();
   const { setUser } = useStore();
 
-  const [nationalId, setNationalId] = useState('');
-  const [password,   setPassword]   = useState('');
-  const [showPass,   setShowPass]   = useState(false);
-  const [loading,    setLoading]    = useState(false);
-  const [errors,     setErrors]     = useState<Record<string, string>>({});
+  const [nationalId,  setNationalId]  = useState('');
+  const [password,    setPassword]    = useState('');
+  const [showPass,    setShowPass]    = useState(false);
+  const [loading,     setLoading]     = useState(false);
+  const [errors,      setErrors]      = useState<Record<string, string>>({});
 
+  // Biometric state
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioEnabled,   setBioEnabled]   = useState(false);
+  const [bioLabel,     setBioLabel]     = useState('Biometric');
+  const [bioIcon,      setBioIcon]      = useState('fingerprint');
+  const [bioLoading,   setBioLoading]   = useState(false);
+
+  // ── Check biometric support on mount ────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      const available = await isBiometricAvailable();
+      if (!available) return;
+      setBioAvailable(true);
+      const [enabled, label, icon] = await Promise.all([
+        isDriverBiometricEnabled(),
+        getBiometricLabel(),
+        getBiometricIcon(),
+      ]);
+      setBioEnabled(enabled);
+      setBioLabel(label);
+      setBioIcon(icon);
+      // Auto-prompt if already enrolled
+      if (enabled) triggerBiometric();
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Core login logic (shared by password + biometric) ───────────────────────
+  const loginWithCredentials = useCallback(async (id: string, pass: string) => {
+    setLoading(true);
+    try {
+      const res = await authAPI.login({ nationalId: id.trim(), password: pass });
+      const { token, user } = res.data;
+      await AsyncStorage.setItem('auth_token', token);
+      setUser(user);
+    } catch {
+      // Dev fallback — load saved account from AsyncStorage
+      const saved = await AsyncStorage.getItem('nsp_user');
+      if (saved) {
+        const user = JSON.parse(saved);
+        if (user.nationalId === id.trim()) {
+          await AsyncStorage.setItem('auth_token', 'dev_token');
+          setUser(user);
+          return 'ok';
+        }
+        return 'not_found';
+      }
+      return 'no_account';
+    } finally {
+      setLoading(false);
+    }
+    return 'ok';
+  }, [setUser]);
+
+  // ── Password login ───────────────────────────────────────────────────────────
   const validate = () => {
     const e: Record<string, string> = {};
     if (nationalId.trim().length < 4) e.nationalId = 'Enter your National ID number.';
@@ -42,14 +107,15 @@ export default function LoginScreen() {
       const { token, user } = res.data;
       await AsyncStorage.setItem('auth_token', token);
       setUser(user);
+      offerBiometricEnroll(nationalId.trim(), password);
     } catch {
-      // Dev fallback — load saved account from AsyncStorage
       const saved = await AsyncStorage.getItem('nsp_user');
       if (saved) {
         const user = JSON.parse(saved);
         if (user.nationalId === nationalId.trim()) {
           await AsyncStorage.setItem('auth_token', 'dev_token');
           setUser(user);
+          offerBiometricEnroll(nationalId.trim(), password);
         } else {
           setErrors({ nationalId: 'National ID not found. Please register first.' });
         }
@@ -59,6 +125,52 @@ export default function LoginScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // ── Biometric login ──────────────────────────────────────────────────────────
+  const triggerBiometric = useCallback(async () => {
+    if (bioLoading) return;
+    setBioLoading(true);
+    try {
+      const passed = await authenticateBiometric('Sign in to Nepal Smart Parking');
+      if (!passed) return;
+      const creds = await getDriverBiometricCredentials();
+      if (!creds) {
+        Alert.alert('Setup Required', 'Please sign in with your password once to re-enable biometric login.');
+        await clearDriverBiometric();
+        setBioEnabled(false);
+        return;
+      }
+      const result = await loginWithCredentials(creds.nationalId, creds.password);
+      if (result === 'not_found' || result === 'no_account') {
+        Alert.alert('Biometric Login Failed', 'Your saved credentials are no longer valid. Please log in with your password.');
+        await clearDriverBiometric();
+        setBioEnabled(false);
+      }
+    } catch {
+      // silently ignore hardware errors
+    } finally {
+      setBioLoading(false);
+    }
+  }, [bioLoading, loginWithCredentials]);
+
+  // ── Offer to enable biometric after first password login ─────────────────────
+  const offerBiometricEnroll = async (id: string, pass: string) => {
+    if (!bioAvailable || bioEnabled) return;
+    Alert.alert(
+      `Enable ${bioLabel} Login?`,
+      `Sign in faster next time using your ${bioLabel.toLowerCase()} — no need to enter your password.`,
+      [
+        { text: 'Not Now', style: 'cancel' },
+        {
+          text: 'Enable',
+          onPress: async () => {
+            await saveDriverBiometric(id, pass);
+            setBioEnabled(true);
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -77,6 +189,34 @@ export default function LoginScreen() {
           <Text style={styles.brandName}>Nepal Smart Parking</Text>
           <Text style={styles.brandSub}>Sign in to your account</Text>
         </View>
+
+        {/* Biometric quick-login (shown when enrolled) */}
+        {bioAvailable && bioEnabled && (
+          <TouchableOpacity
+            style={styles.bioQuickBtn}
+            onPress={triggerBiometric}
+            activeOpacity={0.8}
+            disabled={bioLoading}
+          >
+            {bioLoading ? (
+              <ActivityIndicator color={Colors.primary} size="small" />
+            ) : (
+              <>
+                <Icon name={bioIcon as any} size={28} color={Colors.primary} />
+                <Text style={styles.bioQuickText}>Sign in with {bioLabel}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+
+        {/* Divider */}
+        {bioAvailable && bioEnabled && (
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or use password</Text>
+            <View style={styles.dividerLine} />
+          </View>
+        )}
 
         {/* National ID */}
         <Text style={styles.label}>National ID Number</Text>
@@ -127,6 +267,16 @@ export default function LoginScreen() {
           }
         </TouchableOpacity>
 
+        {/* Biometric setup prompt (shown when available but not yet enabled) */}
+        {bioAvailable && !bioEnabled && (
+          <View style={styles.bioSetupRow}>
+            <Icon name={bioIcon as any} size={15} color={Colors.muted} />
+            <Text style={styles.bioSetupText}>
+              {bioLabel} login available — sign in with your password once to enable it.
+            </Text>
+          </View>
+        )}
+
         {/* Register link */}
         <View style={styles.registerRow}>
           <Text style={styles.registerPrompt}>Don't have an account? </Text>
@@ -171,6 +321,31 @@ const styles = StyleSheet.create({
   brandName: { fontSize: 22, fontWeight: '800', color: Colors.text },
   brandSub:  { fontSize: 14, color: Colors.muted, marginTop: 4 },
 
+  // ── Biometric quick-login button ────────────────────────────────────────────
+  bioQuickBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: Spacing.sm,
+    borderWidth: 2, borderColor: Colors.primary,
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.md + 4,
+    backgroundColor: Colors.primaryLight,
+    marginBottom: Spacing.md,
+  },
+  bioQuickText: { fontSize: 15, fontWeight: '700', color: Colors.primary },
+
+  dividerRow:  { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md },
+  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  dividerText: { fontSize: 12, color: Colors.muted },
+
+  // ── Biometric setup hint ────────────────────────────────────────────────────
+  bioSetupRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginTop: Spacing.md,
+    backgroundColor: Colors.light, borderRadius: BorderRadius.sm,
+    padding: Spacing.sm + 2,
+  },
+  bioSetupText: { flex: 1, fontSize: 11, color: Colors.muted, lineHeight: 16 },
+
   label: { fontSize: 13, fontWeight: '600', color: Colors.text, marginBottom: Spacing.xs, marginTop: Spacing.md },
 
   inputWrap: {
@@ -187,7 +362,7 @@ const styles = StyleSheet.create({
     fontSize: 15, color: Colors.text,
   },
 
-  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  errorRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   errorText: { fontSize: 12, color: Colors.red, flex: 1 },
 
   btn: {

@@ -222,7 +222,7 @@ export const useStore = create<NSPStore>((set, get) => ({
     // Pre-seed with demo data so officer can test without a real driver logged in
     'BA 1 KHA 1234': {
       sessionId: 'DEMO-001', plateNumber: 'BA 1 KHA 1234',
-      driverName: 'Ram Sharma', phone: '+977 9812345678',
+      driverName: 'Ram Sharma', phone: '+977 9812345678', nationalId: 'N-DEMO-001',
       vehicleType: '4w', zoneCode: 'Z-KMC-01', zoneName: 'New Road',
       startTime: new Date(Date.now() - 95 * 60000),
       endTimeCap: new Date(Date.now() - 35 * 60000),
@@ -230,7 +230,7 @@ export const useStore = create<NSPStore>((set, get) => ({
     },
     'BA 2 CHA 5678': {
       sessionId: 'DEMO-002', plateNumber: 'BA 2 CHA 5678',
-      driverName: 'Sita Thapa', phone: '+977 9845678901',
+      driverName: 'Sita Thapa', phone: '+977 9845678901', nationalId: 'N-DEMO-002',
       vehicleType: '2w', zoneCode: 'Z-KMC-01', zoneName: 'New Road',
       startTime: new Date(Date.now() - 30 * 60000),
       endTimeCap: new Date(Date.now() + 30 * 60000),
@@ -238,7 +238,7 @@ export const useStore = create<NSPStore>((set, get) => ({
     },
     'GA 1 JA 9012': {
       sessionId: 'DEMO-003', plateNumber: 'GA 1 JA 9012',
-      driverName: 'Hari Karki', phone: '+977 9823456789',
+      driverName: 'Hari Karki', phone: '+977 9823456789', nationalId: 'N-DEMO-003',
       vehicleType: '4w', zoneCode: 'Z-KMC-01', zoneName: 'New Road',
       startTime: new Date(Date.now() - 150 * 60000),
       endTimeCap: new Date(Date.now() - 90 * 60000),

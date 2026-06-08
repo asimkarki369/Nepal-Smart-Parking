@@ -88,6 +88,7 @@ export default function OfficerScanScreen() {
       setResult({
         sessionId: '', plateNumber: p, driverName: 'Unknown',
         phone: '—', vehicleType: '4w', zoneCode: '—', zoneName: '—',
+        nationalId: '—',
         startTime: new Date(), endTimeCap: null, hourlyRate: 0,
         paymentMethod: '—', qrToken: '',
         overtimeMins: 0, fineAmount: ILLEGAL_PARKING_FINE, status: 'no_session',
@@ -336,7 +337,7 @@ export default function OfficerScanScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
             activeOpacity={1}
             onPress={() => setShowConfirm(false)}
           />

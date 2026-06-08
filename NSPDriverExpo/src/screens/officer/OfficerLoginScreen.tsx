@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   StatusBar, ActivityIndicator, KeyboardAvoidingView,
@@ -12,6 +12,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius } from '@/utils/theme';
 import { useStore } from '@/store/useStore';
 import { RootStackParamList } from '@/navigation/types';
+import {
+  isBiometricAvailable,
+  isOfficerBiometricEnabled,
+  getBiometricLabel,
+  getBiometricIcon,
+  authenticateBiometric,
+  saveOfficerBiometric,
+  getOfficerBiometricCredentials,
+  clearOfficerBiometric,
+} from '@/utils/biometricAuth';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'OfficerLogin'>;
 
@@ -53,6 +63,83 @@ export default function OfficerLoginScreen() {
   const [recError,      setRecError]      = useState('');
   const [recoveredOfficer, setRecoveredOfficer] = useState<typeof MOCK_OFFICERS[0] | null>(null);
 
+  // Biometric state
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioEnabled,   setBioEnabled]   = useState(false);
+  const [bioLabel,     setBioLabel]     = useState('Biometric');
+  const [bioIcon,      setBioIcon]      = useState('fingerprint');
+  const [bioLoading,   setBioLoading]   = useState(false);
+
+  // ── Check biometric support on mount ────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      const available = await isBiometricAvailable();
+      if (!available) return;
+      setBioAvailable(true);
+      const [enabled, label, icon] = await Promise.all([
+        isOfficerBiometricEnabled(),
+        getBiometricLabel(),
+        getBiometricIcon(),
+      ]);
+      setBioEnabled(enabled);
+      setBioLabel(label);
+      setBioIcon(icon);
+      if (enabled) triggerBiometric();
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Biometric login ──────────────────────────────────────────────────────────
+  const triggerBiometric = useCallback(async () => {
+    if (bioLoading) return;
+    setBioLoading(true);
+    try {
+      const passed = await authenticateBiometric('Officer Login — Nepal Smart Parking');
+      if (!passed) return;
+      const creds = await getOfficerBiometricCredentials();
+      if (!creds) {
+        Alert.alert('Setup Required', 'Please sign in with your password once to re-enable biometric login.');
+        await clearOfficerBiometric();
+        setBioEnabled(false);
+        return;
+      }
+      // Authenticate with saved credentials
+      const officer = MOCK_OFFICERS.find(
+        o => o.id.toUpperCase() === creds.officerId.toUpperCase() && o.password === creds.password,
+      );
+      if (!officer) {
+        Alert.alert('Biometric Login Failed', 'Your saved credentials are no longer valid. Please log in with your password.');
+        await clearOfficerBiometric();
+        setBioEnabled(false);
+        return;
+      }
+      setOfficer({ id: officer.id, name: officer.name, zone: officer.zone, badgeNumber: officer.badge });
+    } catch {
+      // silently ignore hardware errors
+    } finally {
+      setBioLoading(false);
+    }
+  }, [bioLoading, setOfficer]);
+
+  // ── Offer to enable biometric after first successful password login ──────────
+  const offerBiometricEnroll = (id: string, pass: string) => {
+    if (!bioAvailable || bioEnabled) return;
+    Alert.alert(
+      `Enable ${bioLabel} Login?`,
+      `Sign in faster next time using your ${bioLabel.toLowerCase()} — no need to enter your Officer ID or password.`,
+      [
+        { text: 'Not Now', style: 'cancel' },
+        {
+          text: 'Enable',
+          onPress: async () => {
+            await saveOfficerBiometric(id, pass);
+            setBioEnabled(true);
+          },
+        },
+      ],
+    );
+  };
+
   const handleLogin = async () => {
     if (!officerId.trim() || !password) {
       setError('Enter your Officer ID and password.');
@@ -75,6 +162,7 @@ export default function OfficerLoginScreen() {
 
     setOfficer({ id: officer.id, name: officer.name, zone: officer.zone, badgeNumber: officer.badge });
     setLoading(false);
+    offerBiometricEnroll(officerId.trim(), password);
   };
 
   const handleRecover = async () => {
@@ -341,6 +429,33 @@ export default function OfficerLoginScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Biometric quick-login */}
+        {bioAvailable && bioEnabled && (
+          <>
+            <TouchableOpacity
+              style={styles.bioBtn}
+              onPress={triggerBiometric}
+              activeOpacity={0.8}
+              disabled={bioLoading}
+            >
+              {bioLoading ? (
+                <ActivityIndicator color="#E65100" size="small" />
+              ) : (
+                <>
+                  <Icon name={bioIcon as any} size={22} color="#E65100" />
+                  <Text style={styles.bioBtnText}>Sign in with {bioLabel}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or use password</Text>
+              <View style={styles.dividerLine} />
+            </View>
+          </>
+        )}
+
         {/* Forgot link */}
         <TouchableOpacity style={styles.forgotLink} onPress={() => setStep('recover')}>
           <Icon name="help-circle-outline" size={14} color="#E65100" />
@@ -367,6 +482,16 @@ export default function OfficerLoginScreen() {
               </>
           }
         </TouchableOpacity>
+
+        {/* Biometric setup hint */}
+        {bioAvailable && !bioEnabled && (
+          <View style={styles.bioSetupRow}>
+            <Icon name={bioIcon as any} size={14} color={Colors.muted} />
+            <Text style={styles.bioSetupText}>
+              {bioLabel} login available — log in with your password once to enable it.
+            </Text>
+          </View>
+        )}
 
         <View style={styles.hintCard}>
           <Icon name="information-outline" size={15} color="#E65100" />
@@ -415,6 +540,30 @@ const styles = StyleSheet.create({
     flex: 1, paddingVertical: Spacing.md + 2, paddingHorizontal: Spacing.sm,
     fontSize: 15, color: Colors.text,
   },
+
+  // ── Biometric ─────────────────────────────────────────────────────────────
+  bioBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: Spacing.sm,
+    borderWidth: 2, borderColor: '#E65100',
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.md + 2,
+    backgroundColor: '#FFF3E0',
+    marginTop: Spacing.xl,
+  },
+  bioBtnText: { fontSize: 14, fontWeight: '700', color: '#E65100' },
+
+  dividerRow:  { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.md },
+  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  dividerText: { fontSize: 12, color: Colors.muted },
+
+  bioSetupRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginTop: Spacing.md,
+    backgroundColor: Colors.light, borderRadius: BorderRadius.sm,
+    padding: Spacing.sm + 2,
+  },
+  bioSetupText: { flex: 1, fontSize: 11, color: Colors.muted, lineHeight: 16 },
 
   forgotLink: {
     flexDirection: 'row', alignItems: 'center', gap: 5,

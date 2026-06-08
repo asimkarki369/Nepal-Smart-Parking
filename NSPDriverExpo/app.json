@@ -50,6 +50,7 @@
         }
       ],
       "expo-sharing",
+      "expo-local-authentication",
       [
         "expo-image-picker",
         {

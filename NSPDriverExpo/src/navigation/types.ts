@@ -15,7 +15,7 @@ export type RootStackParamList = {
   OfficerLogin: undefined;
   // Officer main
   OfficerMain: undefined;
-  SessionVerify: { sessionToken: string };
+  SessionVerify: { sessionToken: string; overtimeMins: number; fineAmount: number };
   IssueFineSummary: { sessionToken: string; overtimeMins: number; fineAmount: number };
 };
 

@@ -104,7 +104,7 @@ export default function SessionVerifyScreen() {
     addFine({
       fineId:       `FINE-${Date.now()}`,
       sessionToken: sessionToken,
-      plateNumber:  session?.plate ?? sessionToken,
+      plateNumber:  session?.plateNumber ?? sessionToken,
       zoneName:     session?.zoneName ?? 'Unknown Zone',
       overtimeMins,
       fineAmount,
@@ -133,7 +133,7 @@ export default function SessionVerifyScreen() {
           <Text style={styles.issuedTitle}>Fine Successfully Issued</Text>
           <Text style={styles.issuedSub}>
             Rs {fineAmount} fine recorded for{'\n'}
-            <Text style={{ fontWeight: '800' }}>{session?.plate ?? sessionToken}</Text>
+            <Text style={{ fontWeight: '800' }}>{session?.plateNumber ?? sessionToken}</Text>
           </Text>
 
           <View style={styles.issuedSummary}>
@@ -273,7 +273,7 @@ export default function SessionVerifyScreen() {
         {step === 'evidence' && (
           <>
             <View style={styles.evidenceNotice}>
-              <Icon name="camera-alert" size={20} color="#E65100" />
+              <Icon name="camera-enhance" size={20} color="#E65100" />
               <Text style={styles.evidenceNoticeText}>
                 All 7 photos are mandatory before a fine can be issued. This protects officers from disputes.
               </Text>
@@ -340,7 +340,7 @@ export default function SessionVerifyScreen() {
           <>
             <View style={styles.confirmCard}>
               <Text style={styles.cardLabel}>FINE SUMMARY</Text>
-              <SummaryRow label="Vehicle plate" value={session?.plate ?? sessionToken} bold />
+              <SummaryRow label="Vehicle plate" value={session?.plateNumber ?? sessionToken} bold />
               <SummaryRow label="Driver"        value={session?.driverName ?? 'Unknown'} />
               <SummaryRow label="Zone"          value={session?.zoneName ?? 'Unknown'} />
               <SummaryRow label="Overtime"      value={`${overtimeMins} minutes`} />
